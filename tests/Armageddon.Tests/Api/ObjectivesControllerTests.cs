@@ -47,21 +47,38 @@ public class ObjectivesControllerTests
     }
 
     [Fact]
-    public async Task Add_ReturnsCreated_WithObjective()
+    public async Task Add_ReturnsCreated_WithRecurringObjective()
     {
-        var objective = new Objective { Id = 1, Name = "Assists" };
-        _mockService.Setup(s => s.AddObjectiveAsync("Assists")).ReturnsAsync(objective);
+        var request = new AddObjectiveRequest("Assists", ObjectiveType.Recurring, null);
+        var objective = new Objective { Id = 1, Name = "Assists", Type = ObjectiveType.Recurring };
+        _mockService.Setup(s => s.AddObjectiveAsync("Assists", ObjectiveType.Recurring, null))
+                    .ReturnsAsync(objective);
 
-        var result = await CreateController().Add("Assists");
+        var result = await CreateController().Add(request);
 
         var created = Assert.IsType<CreatedAtActionResult>(result);
         Assert.Equal(objective, created.Value);
     }
 
     [Fact]
+    public async Task Add_ReturnsCreated_WithOneTimeObjective()
+    {
+        var request = new AddObjectiveRequest("First Blood", ObjectiveType.OneTime, 1);
+        var objective = new Objective { Id = 2, Name = "First Blood", Type = ObjectiveType.OneTime, MaxUsage = 1 };
+        _mockService.Setup(s => s.AddObjectiveAsync("First Blood", ObjectiveType.OneTime, 1))
+                    .ReturnsAsync(objective);
+
+        var result = await CreateController().Add(request);
+
+        var created = Assert.IsType<CreatedAtActionResult>(result);
+        var value = Assert.IsType<Objective>(created.Value);
+        Assert.Equal(ObjectiveType.OneTime, value.Type);
+    }
+
+    [Fact]
     public async Task Add_ReturnsBadRequest_WhenNameIsEmpty()
     {
-        var result = await CreateController().Add("");
+        var result = await CreateController().Add(new AddObjectiveRequest("", ObjectiveType.Recurring, null));
         Assert.IsType<BadRequestObjectResult>(result);
     }
 

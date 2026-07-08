@@ -13,9 +13,9 @@ public class ObjectiveService(ArmageddonDbContext context) : IObjectiveService
     public async Task<Objective?> GetObjectiveByIdAsync(int id)
         => await context.Objectives.AsNoTracking().FirstOrDefaultAsync(o => o.Id == id);
 
-    public async Task<Objective> AddObjectiveAsync(string name)
+    public async Task<Objective> AddObjectiveAsync(string name, ObjectiveType type = ObjectiveType.Recurring, int? maxUsage = null)
     {
-        var objective = new Objective { Name = name };
+        var objective = new Objective { Name = name, Type = type, MaxUsage = maxUsage };
         context.Objectives.Add(objective);
         await context.SaveChangesAsync();
         return objective;

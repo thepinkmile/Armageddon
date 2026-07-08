@@ -24,9 +24,10 @@ public class ArmageddonApiClient(HttpClient http) : IArmageddonApiClient
     public async Task<IEnumerable<Objective>> GetObjectivesAsync()
         => await http.GetFromJsonAsync<IEnumerable<Objective>>("api/objectives") ?? [];
 
-    public async Task<Objective> AddObjectiveAsync(string name)
+    public async Task<Objective> AddObjectiveAsync(string name, ObjectiveType type = ObjectiveType.Recurring, int? maxUsage = null)
     {
-        var response = await http.PostAsJsonAsync("api/objectives", name);
+        var response = await http.PostAsJsonAsync("api/objectives",
+            new { Name = name, Type = type, MaxUsage = maxUsage });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<Objective>())!;
     }

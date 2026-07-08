@@ -84,6 +84,17 @@ public class ScoresControllerTests
     }
 
     [Fact]
+    public async Task AddScore_ReturnsBadRequest_WhenUsageLimitExceeded()
+    {
+        _mockService.Setup(s => s.AddScoreAsync(1, 1, 1, 10))
+            .ThrowsAsync(new InvalidOperationException("Team has already reached the usage limit."));
+
+        var result = await CreateController().AddScore(new AddScoreRequest(1, 1, 1, 10));
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
     public async Task Remove_ReturnsNoContent_WhenSuccessful()
     {
         _mockService.Setup(s => s.RemoveScoreAsync(1)).ReturnsAsync(true);

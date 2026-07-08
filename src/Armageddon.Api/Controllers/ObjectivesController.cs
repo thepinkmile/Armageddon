@@ -1,4 +1,5 @@
 using Armageddon.Abstractions.Interfaces;
+using Armageddon.Abstractions.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Armageddon.Api.Controllers;
@@ -19,11 +20,11 @@ public class ObjectivesController(IObjectiveService objectiveService) : Controll
     }
 
     [HttpPost]
-    public async Task<IActionResult> Add([FromBody] string name)
+    public async Task<IActionResult> Add([FromBody] AddObjectiveRequest request)
     {
-        if (string.IsNullOrWhiteSpace(name))
+        if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest("Objective name is required.");
-        var objective = await objectiveService.AddObjectiveAsync(name);
+        var objective = await objectiveService.AddObjectiveAsync(request.Name, request.Type, request.MaxUsage);
         return CreatedAtAction(nameof(GetById), new { id = objective.Id }, objective);
     }
 
@@ -34,3 +35,5 @@ public class ObjectivesController(IObjectiveService objectiveService) : Controll
         return removed ? NoContent() : NotFound();
     }
 }
+
+public record AddObjectiveRequest(string Name, ObjectiveType Type = ObjectiveType.Recurring, int? MaxUsage = null);

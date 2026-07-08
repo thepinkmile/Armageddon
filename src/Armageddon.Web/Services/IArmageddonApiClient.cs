@@ -11,7 +11,7 @@ public interface IArmageddonApiClient
 
     // Objectives
     Task<IEnumerable<Objective>> GetObjectivesAsync();
-    Task<Objective> AddObjectiveAsync(string name);
+    Task<Objective> AddObjectiveAsync(string name, ObjectiveType type = ObjectiveType.Recurring, int? maxUsage = null);
     Task RemoveObjectiveAsync(int id);
 
     // Rounds

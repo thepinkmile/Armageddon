@@ -12,14 +12,14 @@
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="dashboard" Match="NavLinkMatch.All">
+                <span class="bi bi-bar-chart-fill-nav-menu" aria-hidden="true"></span> Dashboard
+            </NavLink>
+        </div>
+
         <AuthorizeView>
             <Authorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="dashboard" Match="NavLinkMatch.All">
-                        <span class="bi bi-bar-chart-fill-nav-menu" aria-hidden="true"></span> Dashboard
-                    </NavLink>
-                </div>
-
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="teams">
                         <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> Teams

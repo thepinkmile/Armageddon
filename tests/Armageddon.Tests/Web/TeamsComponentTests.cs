@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Armageddon.Tests.Web;
 
-public class TeamsComponentTests : TestContext
+public class TeamsComponentTests : BunitContext
 {
     private readonly Mock<IArmageddonApiClient> _mockClient = new();
 
@@ -22,7 +22,7 @@ public class TeamsComponentTests : TestContext
     {
         _mockClient.Setup(c => c.GetTeamsAsync()).ReturnsAsync(Array.Empty<Team>());
 
-        var cut = RenderComponent<Teams>();
+        var cut = Render<Teams>();
 
         cut.WaitForState(() => cut.Markup.Contains("No teams yet"), timeout: TimeSpan.FromSeconds(5));
         Assert.Contains("No teams yet", cut.Markup);
@@ -38,7 +38,7 @@ public class TeamsComponentTests : TestContext
         };
         _mockClient.Setup(c => c.GetTeamsAsync()).ReturnsAsync(teams);
 
-        var cut = RenderComponent<Teams>();
+        var cut = Render<Teams>();
 
         cut.WaitForState(() => cut.Markup.Contains("Alpha"), timeout: TimeSpan.FromSeconds(5));
         Assert.Contains("Alpha", cut.Markup);
@@ -54,7 +54,7 @@ public class TeamsComponentTests : TestContext
             .Callback<string>(name => teams.Add(new Team { Id = 1, Name = name }))
             .ReturnsAsync(new Team { Id = 1, Name = "Charlie" });
 
-        var cut = RenderComponent<Teams>();
+        var cut = Render<Teams>();
 
         cut.WaitForState(() => !cut.Markup.Contains("Loading"), timeout: TimeSpan.FromSeconds(5));
 
@@ -77,7 +77,7 @@ public class TeamsComponentTests : TestContext
             .Callback<int>(_ => teams.Clear())
             .Returns(Task.CompletedTask);
 
-        var cut = RenderComponent<Teams>();
+        var cut = Render<Teams>();
 
         cut.WaitForState(() => cut.Markup.Contains("Alpha"), timeout: TimeSpan.FromSeconds(5));
 
@@ -92,7 +92,7 @@ public class TeamsComponentTests : TestContext
     {
         _mockClient.Setup(c => c.GetTeamsAsync()).ThrowsAsync(new HttpRequestException("Connection refused"));
 
-        var cut = RenderComponent<Teams>();
+        var cut = Render<Teams>();
 
         cut.WaitForState(() => cut.Markup.Contains("Failed"), timeout: TimeSpan.FromSeconds(5));
         Assert.Contains("Failed to load teams", cut.Markup);

@@ -16,17 +16,22 @@ public class ScoreServiceTests
         return new ArmageddonDbContext(options);
     }
 
-    private static async Task<(Team team, Round round, Objective objective)> SeedDependenciesAsync(ArmageddonDbContext context)
+    private static async Task<(Team team, Round round, Objective objective)> SeedDependenciesAsync(
+        ArmageddonDbContext context,
+        ObjectiveType type = ObjectiveType.Recurring,
+        int? maxUsage = null)
     {
         var team = new Team { Name = "Alpha" };
         var round = new Round { Number = 1 };
-        var objective = new Objective { Name = "Kills" };
+        var objective = new Objective { Name = "Kills", Type = type, MaxUsage = maxUsage };
         context.Teams.Add(team);
         context.Rounds.Add(round);
         context.Objectives.Add(objective);
         await context.SaveChangesAsync();
         return (team, round, objective);
     }
+
+    // ── Rounds ────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetRoundsAsync_ReturnsRoundsOrderedByNumber()
@@ -59,6 +64,8 @@ public class ScoreServiceTests
         Assert.Equal(1, result.Number);
         Assert.Equal(1, await context.Rounds.CountAsync());
     }
+
+    // ── Basic score CRUD ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task AddScoreAsync_AddsAndReturnsScore()
@@ -154,5 +161,126 @@ public class ScoreServiceTests
 
         Assert.True(result);
         Assert.Equal(0, await context.Scores.CountAsync());
+    }
+
+    // ── AddScoreAsync – objective not found ───────────────────────────────────
+
+    [Fact]
+    public async Task AddScoreAsync_ThrowsInvalidOperation_WhenObjectiveNotFound()
+    {
+        await using var context = CreateContext(nameof(AddScoreAsync_ThrowsInvalidOperation_WhenObjectiveNotFound));
+        var (team, round, _) = await SeedDependenciesAsync(context);
+
+        var service = new ScoreService(context);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.AddScoreAsync(team.Id, round.Id, 9999, 10));
+    }
+
+    // ── OneTime objective validation ──────────────────────────────────────────
+
+    [Fact]
+    public async Task AddScoreAsync_Succeeds_WhenOneTimeObjective_NotYetUsed()
+    {
+        await using var context = CreateContext(nameof(AddScoreAsync_Succeeds_WhenOneTimeObjective_NotYetUsed));
+        var (team, round, objective) = await SeedDependenciesAsync(context, ObjectiveType.OneTime);
+
+        var service = new ScoreService(context);
+        var result = await service.AddScoreAsync(team.Id, round.Id, objective.Id, 10);
+
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task AddScoreAsync_Throws_WhenOneTimeObjective_AlreadyUsedByTeam()
+    {
+        await using var context = CreateContext(nameof(AddScoreAsync_Throws_WhenOneTimeObjective_AlreadyUsedByTeam));
+        var (team, round, objective) = await SeedDependenciesAsync(context, ObjectiveType.OneTime);
+        context.Scores.Add(new Score { TeamId = team.Id, RoundId = round.Id, ObjectiveId = objective.Id, Points = 10 });
+        await context.SaveChangesAsync();
+
+        var service = new ScoreService(context);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.AddScoreAsync(team.Id, round.Id, objective.Id, 10));
+
+        Assert.Contains("usage limit", ex.Message);
+    }
+
+    [Fact]
+    public async Task AddScoreAsync_Succeeds_WhenOneTimeObjective_DifferentTeamAlreadyUsedIt()
+    {
+        await using var context = CreateContext(nameof(AddScoreAsync_Succeeds_WhenOneTimeObjective_DifferentTeamAlreadyUsedIt));
+        var (team, round, objective) = await SeedDependenciesAsync(context, ObjectiveType.OneTime);
+        var team2 = new Team { Name = "Bravo" };
+        context.Teams.Add(team2);
+        await context.SaveChangesAsync();
+
+        // team2 already used the one-time objective
+        context.Scores.Add(new Score { TeamId = team2.Id, RoundId = round.Id, ObjectiveId = objective.Id, Points = 10 });
+        await context.SaveChangesAsync();
+
+        // team1 should still be allowed
+        var service = new ScoreService(context);
+        var result = await service.AddScoreAsync(team.Id, round.Id, objective.Id, 5);
+
+        Assert.NotNull(result);
+    }
+
+    // ── MaxUsage validation (Recurring) ──────────────────────────────────────
+
+    [Fact]
+    public async Task AddScoreAsync_Succeeds_WhenRecurring_UnlimitedMaxUsage()
+    {
+        await using var context = CreateContext(nameof(AddScoreAsync_Succeeds_WhenRecurring_UnlimitedMaxUsage));
+        var (team, round, objective) = await SeedDependenciesAsync(context, ObjectiveType.Recurring, null);
+
+        var service = new ScoreService(context);
+        for (var i = 0; i < 5; i++)
+            await service.AddScoreAsync(team.Id, round.Id, objective.Id, 1);
+
+        Assert.Equal(5, await context.Scores.CountAsync());
+    }
+
+    [Fact]
+    public async Task AddScoreAsync_Succeeds_WhenRecurring_NegativeOneMaxUsage_MeansUnlimited()
+    {
+        await using var context = CreateContext(nameof(AddScoreAsync_Succeeds_WhenRecurring_NegativeOneMaxUsage_MeansUnlimited));
+        var (team, round, objective) = await SeedDependenciesAsync(context, ObjectiveType.Recurring, -1);
+
+        var service = new ScoreService(context);
+        for (var i = 0; i < 3; i++)
+            await service.AddScoreAsync(team.Id, round.Id, objective.Id, 1);
+
+        Assert.Equal(3, await context.Scores.CountAsync());
+    }
+
+    [Fact]
+    public async Task AddScoreAsync_Throws_WhenRecurring_MaxUsageExceeded()
+    {
+        await using var context = CreateContext(nameof(AddScoreAsync_Throws_WhenRecurring_MaxUsageExceeded));
+        var (team, round, objective) = await SeedDependenciesAsync(context, ObjectiveType.Recurring, 2);
+
+        var service = new ScoreService(context);
+        await service.AddScoreAsync(team.Id, round.Id, objective.Id, 1);
+        await service.AddScoreAsync(team.Id, round.Id, objective.Id, 1);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.AddScoreAsync(team.Id, round.Id, objective.Id, 1));
+
+        Assert.Contains("usage limit", ex.Message);
+    }
+
+    // ── EffectiveMaxUsage unit tests ──────────────────────────────────────────
+
+    [Theory]
+    [InlineData(ObjectiveType.OneTime, null, 1)]
+    [InlineData(ObjectiveType.OneTime, -1, 1)]
+    [InlineData(ObjectiveType.OneTime, 3, 1)]   // OneTime wins with min(1,3)=1
+    [InlineData(ObjectiveType.Recurring, null, -1)]
+    [InlineData(ObjectiveType.Recurring, -1, -1)]
+    [InlineData(ObjectiveType.Recurring, 5, 5)]
+    public void EffectiveMaxUsage_ReturnsExpected(ObjectiveType type, int? maxUsage, int expected)
+    {
+        var objective = new Objective { Type = type, MaxUsage = maxUsage };
+        Assert.Equal(expected, ScoreService.EffectiveMaxUsage(objective));
     }
 }

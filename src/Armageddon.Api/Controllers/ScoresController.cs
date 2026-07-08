@@ -33,9 +33,16 @@ public class ScoresController(IScoreService scoreService) : ControllerBase
     [HttpPost]
     public async Task<IActionResult> AddScore([FromBody] AddScoreRequest request)
     {
-        var score = await scoreService.AddScoreAsync(
-            request.TeamId, request.RoundId, request.ObjectiveId, request.Points);
-        return CreatedAtAction(nameof(GetAll), new { id = score.Id }, score);
+        try
+        {
+            var score = await scoreService.AddScoreAsync(
+                request.TeamId, request.RoundId, request.ObjectiveId, request.Points);
+            return CreatedAtAction(nameof(GetAll), new { id = score.Id }, score);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpDelete("{id:int}")]

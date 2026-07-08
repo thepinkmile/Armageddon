@@ -35,6 +35,11 @@ public class ScoreService(ArmageddonDbContext context) : IScoreService
 
     public async Task<Score> AddScoreAsync(int teamId, int roundId, int objectiveId, int points)
     {
+        var objective = await context.Objectives.FindAsync(objectiveId)
+            ?? throw new InvalidOperationException($"Objective {objectiveId} not found.");
+
+        await ValidateUsageLimitAsync(teamId, objective);
+
         var score = new Score
         {
             TeamId = teamId,
@@ -65,5 +70,48 @@ public class ScoreService(ArmageddonDbContext context) : IScoreService
         context.Rounds.Add(round);
         await context.SaveChangesAsync();
         return round;
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Determines the effective per-team usage ceiling for an objective:
+    /// <list type="bullet">
+    ///   <item>OneTime objectives have an implicit ceiling of 1.</item>
+    ///   <item><c>null</c> or <c>-1</c> MaxUsage means unlimited (-1 sentinel).</item>
+    ///   <item>Otherwise MaxUsage is used directly; for OneTime the more restrictive value wins.</item>
+    /// </list>
+    /// </summary>
+    public static int EffectiveMaxUsage(Objective objective)
+    {
+        var ceiling = (objective.MaxUsage is null or -1) ? -1 : objective.MaxUsage.Value;
+
+        if (objective.Type == ObjectiveType.OneTime)
+        {
+            // If MaxUsage was explicitly set to a positive value use the smaller of 1 and that value;
+            // otherwise fall back to 1.
+            return ceiling == -1 ? 1 : Math.Min(1, ceiling);
+        }
+
+        return ceiling;
+    }
+
+    private async Task ValidateUsageLimitAsync(int teamId, Objective objective)
+    {
+        var limit = EffectiveMaxUsage(objective);
+        if (limit == -1) return; // unlimited — nothing to validate
+
+        var usageCount = await context.Scores
+            .CountAsync(s => s.TeamId == teamId && s.ObjectiveId == objective.Id);
+
+        if (usageCount >= limit)
+        {
+            var typeName = objective.Type == ObjectiveType.OneTime ? "one-time" : "recurring";
+            throw new InvalidOperationException(
+                $"Team {teamId} has already reached the usage limit ({limit}) " +
+                $"for {typeName} objective '{objective.Name}'.");
+        }
     }
 }

@@ -1,3 +1,4 @@
+using Armageddon.Abstractions.Models;
 using Armageddon.Api.Data;
 using Armageddon.Api.Services;
 using Microsoft.EntityFrameworkCore;
@@ -20,8 +21,8 @@ public class ObjectiveServiceTests
     {
         await using var context = CreateContext(nameof(GetAllObjectivesAsync_ReturnsAllObjectives));
         context.Objectives.AddRange(
-            new Abstractions.Models.Objective { Name = "Kills" },
-            new Abstractions.Models.Objective { Name = "Captures" });
+            new Objective { Name = "Kills" },
+            new Objective { Name = "Captures" });
         await context.SaveChangesAsync();
 
         var service = new ObjectiveService(context);
@@ -36,7 +37,7 @@ public class ObjectiveServiceTests
     public async Task GetObjectiveByIdAsync_ReturnsObjective_WhenExists()
     {
         await using var context = CreateContext(nameof(GetObjectiveByIdAsync_ReturnsObjective_WhenExists));
-        var obj = new Abstractions.Models.Objective { Name = "Kills" };
+        var obj = new Objective { Name = "Kills" };
         context.Objectives.Add(obj);
         await context.SaveChangesAsync();
 
@@ -57,17 +58,40 @@ public class ObjectiveServiceTests
     }
 
     [Fact]
-    public async Task AddObjectiveAsync_AddsAndReturnsObjective()
+    public async Task AddObjectiveAsync_AddsWithDefaultType_Recurring()
     {
-        await using var context = CreateContext(nameof(AddObjectiveAsync_AddsAndReturnsObjective));
+        await using var context = CreateContext(nameof(AddObjectiveAsync_AddsWithDefaultType_Recurring));
         var service = new ObjectiveService(context);
 
         var result = await service.AddObjectiveAsync("Assists");
 
-        Assert.NotNull(result);
         Assert.Equal("Assists", result.Name);
-        Assert.True(result.Id > 0);
-        Assert.Equal(1, await context.Objectives.CountAsync());
+        Assert.Equal(ObjectiveType.Recurring, result.Type);
+        Assert.Null(result.MaxUsage);
+    }
+
+    [Fact]
+    public async Task AddObjectiveAsync_AddsOneTimeObjective_WithMaxUsage()
+    {
+        await using var context = CreateContext(nameof(AddObjectiveAsync_AddsOneTimeObjective_WithMaxUsage));
+        var service = new ObjectiveService(context);
+
+        var result = await service.AddObjectiveAsync("First Blood", ObjectiveType.OneTime, 1);
+
+        Assert.Equal(ObjectiveType.OneTime, result.Type);
+        Assert.Equal(1, result.MaxUsage);
+    }
+
+    [Fact]
+    public async Task AddObjectiveAsync_AddsRecurringObjective_WithMaxUsage()
+    {
+        await using var context = CreateContext(nameof(AddObjectiveAsync_AddsRecurringObjective_WithMaxUsage));
+        var service = new ObjectiveService(context);
+
+        var result = await service.AddObjectiveAsync("Captures", ObjectiveType.Recurring, 5);
+
+        Assert.Equal(ObjectiveType.Recurring, result.Type);
+        Assert.Equal(5, result.MaxUsage);
     }
 
     [Fact]
@@ -83,7 +107,7 @@ public class ObjectiveServiceTests
     public async Task RemoveObjectiveAsync_ReturnsTrue_AndRemovesObjective()
     {
         await using var context = CreateContext(nameof(RemoveObjectiveAsync_ReturnsTrue_AndRemovesObjective));
-        var obj = new Abstractions.Models.Objective { Name = "Flags" };
+        var obj = new Objective { Name = "Flags" };
         context.Objectives.Add(obj);
         await context.SaveChangesAsync();
 
