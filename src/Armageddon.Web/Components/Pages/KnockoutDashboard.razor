@@ -1,0 +1,170 @@
+@page "/knockout"
+@rendermode InteractiveServer
+@using Armageddon.Abstractions.Models
+@using Armageddon.Web.Services
+@inject IArmageddonApiClient ApiClient
+
+<PageTitle>Dashboard – Tournament Bracket</PageTitle>
+
+<h2>Tournament Bracket</h2>
+
+@if (isLoading)
+{
+    <p><em>Loading…</em></p>
+}
+else if (teams.Count < 2)
+{
+    <p>At least 2 teams are needed for a tournament bracket. Add teams on the <a href="teams">Teams</a> tab.</p>
+}
+else
+{
+    <button @onclick="RandomiseBracket">Randomise Bracket</button>
+
+    <div style="display:flex; gap:2rem; overflow-x:auto; margin-top:1rem; align-items:flex-start;">
+        @for (int r = 0; r < bracketRounds.Count; r++)
+        {
+            var roundMatchups = bracketRounds[r];
+            var roundLabel = GetRoundLabel(r, bracketRounds.Count);
+            var spacer = (int)Math.Pow(2, r);
+            <div style="display:flex; flex-direction:column; gap:0;">
+                <div style="text-align:center; font-weight:bold; margin-bottom:0.5rem;">@roundLabel</div>
+                @foreach (var matchup in roundMatchups)
+                {
+                    var winnerTeam = GetMatchupWinner(matchup);
+                    <div style="margin-bottom:@(spacer)rem; border:1px solid #999; padding:0.4rem; min-width:160px;">
+                        @RenderEntry(matchup.TeamA, winnerTeam, matchup.TeamB == null)
+                        @RenderEntry(matchup.TeamB, winnerTeam, matchup.TeamA == null)
+                    </div>
+                }
+            </div>
+        }
+        @if (overallWinner != null)
+        {
+            <div style="display:flex; flex-direction:column; justify-content:center; padding-top:1.5rem;">
+                <div style="border:2px solid #000; padding:0.5rem; min-width:160px; text-align:center;">
+                    <div style="font-weight:bold;">Winner</div>
+                    <div>@overallWinner.Name</div>
+                    <div>(@GetTotalScore(overallWinner.Id) pts)</div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@code {
+    private record Matchup(Team? TeamA, Team? TeamB);
+
+    private List<Team> teams = [];
+    private List<Score> scores = [];
+    private List<List<Matchup>> bracketRounds = [];
+    private Team? overallWinner;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            teams = (await ApiClient.GetTeamsAsync()).ToList();
+            scores = (await ApiClient.GetScoresAsync()).ToList();
+            BuildBracket();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load tournament bracket: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void RandomiseBracket()
+    {
+        BuildBracket();
+    }
+
+    private void BuildBracket()
+    {
+        bracketRounds = [];
+        overallWinner = null;
+
+        if (teams.Count < 2)
+            return;
+
+        // Shuffle teams randomly
+        var shuffled = teams.OrderBy(_ => Random.Shared.Next()).ToList();
+
+        // Pad to next power of 2 with nulls (byes)
+        int size = 1;
+        while (size < shuffled.Count)
+            size *= 2;
+        while (shuffled.Count < size)
+            shuffled.Add(null!);
+
+        // Build first round matchups
+        var currentRound = new List<Matchup>();
+        for (int i = 0; i < shuffled.Count; i += 2)
+            currentRound.Add(new Matchup(shuffled[i], i + 1 < shuffled.Count ? shuffled[i + 1] : null));
+
+        bracketRounds.Add(currentRound);
+
+        // Simulate subsequent rounds until one team remains
+        while (currentRound.Count > 1)
+        {
+            var nextRound = new List<Matchup>();
+            for (int i = 0; i < currentRound.Count; i += 2)
+            {
+                var winA = GetMatchupWinner(currentRound[i]);
+                var winB = i + 1 < currentRound.Count ? GetMatchupWinner(currentRound[i + 1]) : null;
+                nextRound.Add(new Matchup(winA, winB));
+            }
+            bracketRounds.Add(nextRound);
+            currentRound = nextRound;
+        }
+
+        overallWinner = currentRound.Count == 1 ? GetMatchupWinner(currentRound[0]) : null;
+    }
+
+    private Team? GetMatchupWinner(Matchup m)
+    {
+        if (m.TeamA == null) return m.TeamB;
+        if (m.TeamB == null) return m.TeamA;
+        return GetTotalScore(m.TeamA.Id) >= GetTotalScore(m.TeamB.Id) ? m.TeamA : m.TeamB;
+    }
+
+    private int GetTotalScore(int teamId)
+        => scores.Where(s => s.TeamId == teamId).Sum(s => s.Points);
+
+    private static string GetRoundLabel(int roundIndex, int totalRounds)
+    {
+        int roundsFromFinal = totalRounds - 1 - roundIndex;
+        return roundsFromFinal switch
+        {
+            0 => "Final",
+            1 => "Semi-Finals",
+            2 => "Quarter-Finals",
+            _ => $"Round of {(int)Math.Pow(2, roundsFromFinal + 1)}"
+        };
+    }
+
+    private RenderFragment RenderEntry(Team? team, Team? winner, bool autoWin) => __builder =>
+    {
+        bool isWinner = team != null && team == winner;
+        string style = isWinner
+            ? "font-weight:bold;"
+            : team == null ? "color:#aaa;" : "color:#666;";
+        <div style="@style">
+            @(team?.Name ?? "(bye)")
+            @if (team != null)
+            {
+                <span style="float:right;">@GetTotalScore(team.Id)</span>
+            }
+        </div>
+    };
+}
