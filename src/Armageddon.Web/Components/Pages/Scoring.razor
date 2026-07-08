@@ -1,0 +1,148 @@
+@page "/scoring"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Armageddon.Abstractions.Models
+@using Armageddon.Web.Services
+@inject IArmageddonApiClient ApiClient
+
+<PageTitle>Scoring</PageTitle>
+
+<h2>Scoring</h2>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<div class="row g-4">
+    <!-- Objectives column -->
+    <div class="col-md-5">
+        <h4>Objectives</h4>
+        <div class="input-group mb-3">
+            <input class="form-control" placeholder="Objective name" @bind="newObjectiveName" @bind:event="oninput" @onkeydown="HandleObjectiveKeyDown" />
+            <button class="btn btn-primary" @onclick="AddObjective" disabled="@string.IsNullOrWhiteSpace(newObjectiveName)">Add</button>
+        </div>
+        @if (isLoading)
+        {
+            <p><em>Loading…</em></p>
+        }
+        else if (!objectives.Any())
+        {
+            <p>No objectives yet.</p>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (var obj in objectives)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>@obj.Name</span>
+                        <button class="btn btn-sm btn-danger" @onclick="() => RemoveObjective(obj.Id)">Remove</button>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+
+    <!-- Rounds column -->
+    <div class="col-md-5">
+        <h4>Rounds</h4>
+        <div class="mb-3">
+            <button class="btn btn-primary" @onclick="AddNextRound">Add Round @(rounds.Count + 1)</button>
+        </div>
+        @if (!rounds.Any())
+        {
+            <p>No rounds yet.</p>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (var round in rounds)
+                {
+                    <li class="list-group-item">Round @round.Number</li>
+                }
+            </ul>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Objective> objectives = [];
+    private List<Round> rounds = [];
+    private string newObjectiveName = string.Empty;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            objectives = (await ApiClient.GetObjectivesAsync()).ToList();
+            rounds = (await ApiClient.GetRoundsAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task AddObjective()
+    {
+        if (string.IsNullOrWhiteSpace(newObjectiveName)) return;
+        errorMessage = null;
+        try
+        {
+            await ApiClient.AddObjectiveAsync(newObjectiveName.Trim());
+            newObjectiveName = string.Empty;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to add objective: {ex.Message}";
+        }
+    }
+
+    private async Task RemoveObjective(int id)
+    {
+        errorMessage = null;
+        try
+        {
+            await ApiClient.RemoveObjectiveAsync(id);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to remove objective: {ex.Message}";
+        }
+    }
+
+    private async Task AddNextRound()
+    {
+        errorMessage = null;
+        try
+        {
+            await ApiClient.AddRoundAsync(rounds.Count + 1);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to add round: {ex.Message}";
+        }
+    }
+
+    private async Task HandleObjectiveKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await AddObjective();
+    }
+}

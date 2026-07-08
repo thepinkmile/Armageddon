@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Armageddon.Web.Components;
 using Armageddon.Web.Components.Account;
 using Armageddon.Web.Data;
+using Armageddon.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,8 +30,13 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
-        options.SignIn.RequireConfirmedAccount = true;
+        options.SignIn.RequireConfirmedAccount = false;
         options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
+        options.Password.RequireDigit = false;
+        options.Password.RequireLowercase = false;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequireUppercase = false;
+        options.Password.RequiredLength = 4;
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
@@ -38,7 +44,34 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5001";
+builder.Services.AddHttpClient<IArmageddonApiClient, ArmageddonApiClient>(client =>
+    client.BaseAddress = new Uri(apiBaseUrl));
+
 var app = builder.Build();
+
+// Seed the default admin user.
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    dbContext.Database.Migrate();
+
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+    const string adminEmail = "admin@armageddon.local";
+    const string adminUserName = "admin";
+    const string adminPassword = "admin";
+
+    if (await userManager.FindByNameAsync(adminUserName) is null)
+    {
+        var adminUser = new ApplicationUser
+        {
+            UserName = adminUserName,
+            Email = adminEmail,
+            EmailConfirmed = true
+        };
+        await userManager.CreateAsync(adminUser, adminPassword);
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -64,3 +97,5 @@ app.MapRazorComponents<App>()
 app.MapAdditionalIdentityEndpoints();
 
 app.Run();
+
+public partial class Program { }

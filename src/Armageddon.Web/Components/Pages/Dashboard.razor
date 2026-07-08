@@ -1,0 +1,87 @@
+@page "/dashboard"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Armageddon.Abstractions.Models
+@using Armageddon.Web.Services
+@inject IArmageddonApiClient ApiClient
+
+<PageTitle>Dashboard – Scoreboard</PageTitle>
+
+<h2>Scoreboard</h2>
+
+@if (isLoading)
+{
+    <p><em>Loading…</em></p>
+}
+else if (!teams.Any())
+{
+    <p>No teams yet. Add teams on the <a href="teams">Teams</a> tab.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-bordered text-center scoreboard">
+            <thead class="table-dark">
+                <tr>
+                    <th>Team</th>
+                    @foreach (var round in rounds)
+                    {
+                        <th>Round @round.Number</th>
+                    }
+                    <th class="table-warning">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var team in teams)
+                {
+                    <tr>
+                        <td class="fw-bold text-start">@team.Name</td>
+                        @foreach (var round in rounds)
+                        {
+                            var pts = RoundScore(team.Id, round.Id);
+                            <td class="@(pts > 0 ? "table-success" : "")">@pts</td>
+                        }
+                        <td class="fw-bold table-warning">@TotalScore(team.Id)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@code {
+    private List<Team> teams = [];
+    private List<Round> rounds = [];
+    private List<Score> scores = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            teams = (await ApiClient.GetTeamsAsync()).ToList();
+            rounds = (await ApiClient.GetRoundsAsync()).ToList();
+            scores = (await ApiClient.GetScoresAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load scoreboard: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private int RoundScore(int teamId, int roundId)
+        => scores.Where(s => s.TeamId == teamId && s.RoundId == roundId).Sum(s => s.Points);
+
+    private int TotalScore(int teamId)
+        => scores.Where(s => s.TeamId == teamId).Sum(s => s.Points);
+}
