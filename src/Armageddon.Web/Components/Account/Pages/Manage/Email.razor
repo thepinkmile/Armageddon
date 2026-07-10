@@ -1,0 +1,71 @@
+﻿@page "/Account/Manage/Email"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using System.ComponentModel.DataAnnotations
+@using Armageddon.Web.Services
+@using Armageddon.Abstractions.Models
+
+@inject IArmageddonApiClient ApiClient
+@inject IApiAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Manage email</PageTitle>
+
+<h3>Manage email</h3>
+
+<StatusMessage Message="@message"/>
+<div class="row">
+    <div class="col-xl-6">
+        <div class="form-floating mb-3 input-group">
+            <input type="text" value="@email" id="email" class="form-control" placeholder="Email" disabled />
+            <label for="email" class="form-label">Email</label>
+        </div>
+        <p class="text-muted">Email management and verification are disabled in kiosk mode.</p>
+    </div>
+</div>
+
+@code {
+    private string? message;
+
+    private User? currentUser;
+    private string? email;
+
+    private InputModel Input { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUser = await ApiClient.GetCurrentUserAsync();
+        if (currentUser is null)
+        {
+            // If API reports no current user, navigate to login
+            NavigationManager.NavigateTo("/Account/Login");
+            return;
+        }
+
+        email = currentUser.Email;
+        Input = new InputModel { NewEmail = email };
+    }
+
+    private Task OnValidSubmitAsync()
+    {
+        // Email change via token/email not supported in kiosk mode.
+        message = "Email change is not supported in kiosk mode.";
+        return Task.CompletedTask;
+    }
+
+    private Task OnSendEmailVerificationAsync()
+    {
+        // Explicitly disabled: no email confirmations in kiosk mode.
+        message = "Email verification is disabled for kiosk mode.";
+        return Task.CompletedTask;
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        [Display(Name = "New email")]
+        public string? NewEmail { get; set; }
+    }
+}

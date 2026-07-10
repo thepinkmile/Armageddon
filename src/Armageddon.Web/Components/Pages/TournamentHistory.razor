@@ -1,0 +1,106 @@
+@page "/history"
+@rendermode InteractiveServer
+@using Armageddon.Abstractions.Models
+@using Armageddon.Web.Services
+@inject IArmageddonApiClient ApiClient
+
+<PageTitle>Tournament History</PageTitle>
+
+<h2 class="mb-4">Tournament History</h2>
+
+@if (isLoading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (!results.Any())
+{
+    <p class="text-muted">No completed tournaments yet. Finalise a tournament to see results here.</p>
+}
+else
+{
+    @foreach (var result in results)
+    {
+        var isExpanded = expandedIds.Contains(result.Id);
+        var collapseId = $"collapse-{result.Id}";
+
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
+                 style="cursor:pointer;" @onclick="() => ToggleExpand(result.Id)">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge bg-warning text-dark fs-6">🏆 @result.WinnerName</span>
+                    <span class="text-muted small">@result.DatePlayed.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                </div>
+                <span class="text-muted">@(isExpanded ? "▲" : "▼")</span>
+            </div>
+
+            @if (isExpanded)
+            {
+                <div class="card-body p-0">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:70px">Pos</th>
+                                <th>Team</th>
+                                <th class="text-end">Total Pts</th>
+                                <th>Highest Round</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in result.Entries.OrderBy(e => e.Position))
+                            {
+                                var rowClass = entry.Position == 1 ? "table-warning fw-bold"
+                                             : entry.Position == 2 ? "table-light"
+                                             : "";
+                                <tr class="@rowClass">
+                                    <td>
+                                        @(entry.Position switch
+                                        {
+                                            1 => "🥇 1st",
+                                            2 => "🥈 2nd",
+                                            3 => "🥉 3rd",
+                                            _ => $"{entry.Position}th"
+                                        })
+                                    </td>
+                                    <td>@entry.TeamName</td>
+                                    <td class="text-end fw-bold">@entry.TotalPoints</td>
+                                    <td>Round @entry.RoundReached</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    private List<TournamentResult> results = [];
+    private HashSet<int> expandedIds = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            results = (await ApiClient.GetTournamentResultsAsync()).ToList();
+            // Expand the most recent tournament by default
+            if (results.Any())
+                expandedIds.Add(results.First().Id);
+        }
+        catch (Exception ex) { errorMessage = $"Failed to load history: {ex.Message}"; }
+        finally { isLoading = false; }
+    }
+
+    private void ToggleExpand(int id)
+    {
+        if (!expandedIds.Remove(id))
+            expandedIds.Add(id);
+    }
+}

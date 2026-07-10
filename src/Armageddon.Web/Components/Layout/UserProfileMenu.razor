@@ -1,0 +1,46 @@
+@using Armageddon.Web.Services
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<AuthorizeView>
+    <Authorized>
+        <div class="user-profile-menu">
+            <button class="profile-toggle btn btn-link" @onclick="ToggleDropdown">
+                <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span>
+                @context.User.Identity?.Name
+                <span class="bi bi-caret-down-fill-nav-menu ms-1" aria-hidden="true"></span>
+            </button>
+            @if (_open)
+            {
+                <div class="profile-dropdown">
+                    <a class="dropdown-item" href="/Account/Manage" @onclick="Close" @onclick:preventDefault="false">
+                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> Account
+                    </a>
+                    <hr class="dropdown-divider" />
+                    <button class="dropdown-item btn btn-link" @onclick="LogoutAsync">
+                        <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
+                    </button>
+                </div>
+            }
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <a class="btn btn-link top-login-link" href="@($"Account/Login?returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}")">
+            <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Login
+        </a>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private bool _open;
+
+    private void ToggleDropdown() => _open = !_open;
+    private void Close() => _open = false;
+
+    private async Task LogoutAsync()
+    {
+        _open = false;
+        await AuthService.LogoutAsync();
+        NavigationManager.NavigateTo("/Account/Login", forceLoad: false);
+    }
+}

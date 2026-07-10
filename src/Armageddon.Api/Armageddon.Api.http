@@ -1,0 +1,6 @@
+@Armageddon.Api_HostAddress = http://localhost:5047
+
+GET {{Armageddon.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

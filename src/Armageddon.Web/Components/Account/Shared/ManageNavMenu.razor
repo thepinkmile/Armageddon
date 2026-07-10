@@ -1,0 +1,24 @@
+﻿@using Armageddon.Web.Services
+
+@inject IArmageddonApiClient ApiClient
+
+<ul class="nav nav-pills flex-column">
+    <li class="nav-item">
+        <NavLink class="nav-link" href="Account/Manage" Match="NavLinkMatch.All">Profile</NavLink>
+    </li>
+    <li class="nav-item">
+        <NavLink class="nav-link" href="Account/Manage/Email">Email</NavLink>
+    </li>
+    <li class="nav-item">
+        <NavLink class="nav-link" href="Account/Manage/ChangePassword">Password</NavLink>
+    </li>
+    @* External logins removed for on-premise deployments *@
+</ul>
+
+@code {
+    protected override Task OnInitializedAsync()
+    {
+        // External logins are not used in kiosk mode; no runtime checks needed.
+        return Task.CompletedTask;
+    }
+}

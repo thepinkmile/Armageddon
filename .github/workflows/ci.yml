@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-and-test:
+    name: Build, Test & Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Run unit tests with coverage
+        run: |
+          dotnet test tests/Armageddon.UnitTests/Armageddon.UnitTests.csproj \
+            --no-build \
+            --configuration Release \
+            /p:CollectCoverage=true \
+            /p:CoverletOutputFormat=cobertura \
+            "/p:CoverletOutput=${{ github.workspace }}/coverage/" \
+            "/p:Exclude=[*]*.Migrations.*%2c[*]Program%2c[*]*OpenApi*" \
+            --logger "trx;LogFileName=UnitTests.trx" \
+            --results-directory "${{ github.workspace }}/test-results"
+
+      - name: Run integration tests
+        run: |
+          dotnet test Armageddon.slnx \
+            --no-build \
+            --configuration Release \
+            --filter "FullyQualifiedName~IntegrationTests" \
+            --logger "trx;LogFileName=IntegrationTests.trx" \
+            --results-directory "${{ github.workspace }}/test-results"
+
+      - name: Install ReportGenerator
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
+      - name: Generate coverage report
+        run: |
+          reportgenerator \
+            "-reports:${{ github.workspace }}/coverage/coverage.cobertura.xml" \
+            "-targetdir:${{ github.workspace }}/coverage/report" \
+            -reporttypes:"MarkdownSummaryGithub;Cobertura;Html"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "${{ github.workspace }}/test-results/"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: "${{ github.workspace }}/coverage/report/"
+
+      - name: Post coverage summary to PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          recreate: true
+          path: ./coverage/report/SummaryGithub.md

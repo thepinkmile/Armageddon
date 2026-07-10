@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Armageddon.Abstractions/Armageddon.Abstractions.csproj" />
+    <Project Path="src/Armageddon.Api/Armageddon.Api.csproj" />
+    <Project Path="src/Armageddon.Web/Armageddon.Web.csproj" />
+  </Folder>
+    <Folder Name="/tests/">
+    <Project Path="tests/Armageddon.UnitTests/Armageddon.UnitTests.csproj" />
+    <Project Path="tests/Armageddon.Api.IntegrationTests/Armageddon.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Armageddon.Web.IntegrationTests/Armageddon.Web.IntegrationTests.csproj" />
+  </Folder>
+</Solution>
+

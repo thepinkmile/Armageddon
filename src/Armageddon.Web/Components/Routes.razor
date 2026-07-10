@@ -1,0 +1,46 @@
+﻿@using Armageddon.Web.Components.Account.Shared
+@using Armageddon.Web.Services
+@inject AuthService AuthService
+@inject TokenProvider TokenProvider
+@inject NavigationManager NavigationManager
+
+@if (!_initialized)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                <NotAuthorized>
+                    <RedirectToLogin />
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+    </Router>
+}
+
+@code {
+    private const string ChangePasswordPath = "/Account/Manage/ChangePassword";
+    private bool _initialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthService.InitializeAsync();
+            _initialized = true;
+
+            if (TokenProvider.MustChangePassword)
+            {
+                var currentPath = new Uri(NavigationManager.Uri).AbsolutePath;
+                if (!currentPath.Equals(ChangePasswordPath, StringComparison.OrdinalIgnoreCase))
+                    NavigationManager.NavigateTo(ChangePasswordPath, forceLoad: false);
+            }
+
+            StateHasChanged();
+        }
+    }
+}

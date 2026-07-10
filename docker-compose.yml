@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/Armageddon.Api/Dockerfile
+    image: armageddon-api:latest
+    container_name: armageddon-api
+    ports:
+      - "5047:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: src/Armageddon.Web/Dockerfile
+    image: armageddon-web:latest
+    container_name: armageddon-web
+    ports:
+      - "5281:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ApiBaseUrl=http://api:80
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - api
+    restart: unless-stopped
+
+networks:
+  default:
+    name: armageddon-network

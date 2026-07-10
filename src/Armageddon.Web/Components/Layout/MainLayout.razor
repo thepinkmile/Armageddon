@@ -1,0 +1,51 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@using Armageddon.Web.Services
+@inject TokenProvider TokenProvider
+@inject NavigationManager NavigationManager
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <UserProfileMenu />
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private const string ChangePasswordPath = "/Account/Manage/ChangePassword";
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        if (TokenProvider.MustChangePassword)
+        {
+            var path = new Uri(e.Location).AbsolutePath;
+            if (!path.Equals(ChangePasswordPath, StringComparison.OrdinalIgnoreCase))
+                NavigationManager.NavigateTo(ChangePasswordPath, forceLoad: false);
+        }
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}
