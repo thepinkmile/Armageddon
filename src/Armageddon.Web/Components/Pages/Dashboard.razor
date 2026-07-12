@@ -1,0 +1,231 @@
+@page "/dashboard"
+@rendermode InteractiveServer
+@using Armageddon.Abstractions.Models
+@using Armageddon.Web.Services
+@inject IArmageddonApiClient ApiClient
+
+<PageTitle>Score Card</PageTitle>
+
+<h2>Score Card</h2>
+
+@if (isLoading)
+{
+    <p><em>Loading…</em></p>
+}
+else if (!teams.Any())
+{
+    <p>No teams yet. Add teams on the <a href="teams">Teams</a> page.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-bordered text-center scoreboard">
+            <thead class="table-dark">
+                <tr>
+                    <th>Team</th>
+                    @foreach (var round in rounds)
+                    {
+                        <th>Round @round.Number</th>
+                    }
+                    <th class="table-warning">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var team in teams)
+                {
+                    <tr>
+                        <td class="fw-bold text-start">@team.Name</td>
+                        @foreach (var round in rounds)
+                        {
+                            var pts = RoundScore(team.Id, round.Id);
+                            <td class="@(pts > 0 ? "table-success" : "")">@pts</td>
+                        }
+                        <td class="fw-bold table-warning">@TotalScore(team.Id)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<!-- Record Score -->
+<div class="card mt-4">
+    <div class="card-header"><h4 class="mb-0">Record Score</h4></div>
+    <div class="card-body">
+        @if (!teams.Any() || !rounds.Any() || !objectives.Any())
+        {
+            <p class="text-muted">Scoring requires at least one team, one round and one objective to be set up first.</p>
+        }
+        else
+        {
+            <div class="row g-3 align-items-end">
+                <div class="col-sm-3">
+                    <label class="form-label">Team</label>
+                    <select class="form-select" @bind="scoreTeamId">
+                        <option value="0">— select team —</option>
+                        @foreach (var t in teams)
+                        {
+                            <option value="@t.Id">@t.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-sm-2">
+                    <label class="form-label">Round</label>
+                    <select class="form-select" @bind="scoreRoundId">
+                        <option value="0">— select round —</option>
+                        @foreach (var r in rounds)
+                        {
+                            <option value="@r.Id">Round @r.Number</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-sm-3">
+                    <label class="form-label">Objective</label>
+                    <select class="form-select" @bind="scoreObjectiveId">
+                        <option value="0">— select objective —</option>
+                        @foreach (var o in objectives)
+                        {
+                            <option value="@o.Id">@o.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-sm-2">
+                    <label class="form-label">Points</label>
+                    <input type="number" class="form-control" @bind="scorePoints" min="0" />
+                </div>
+                <div class="col-sm-2">
+                    <button class="btn btn-success w-100" @onclick="AddScore"
+                            disabled="@(scoreTeamId == 0 || scoreRoundId == 0 || scoreObjectiveId == 0)">
+                        Add Score
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Recorded Scores -->
+<div class="mt-4">
+    <h4>Recorded Scores</h4>
+    @if (!scores.Any())
+    {
+        <p>No scores recorded yet.</p>
+    }
+    else
+    {
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Team</th>
+                    <th>Round</th>
+                    <th>Objective</th>
+                    <th class="text-end">Points</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in scores)
+                {
+                    <tr>
+                        <td>@(teams.FirstOrDefault(t => t.Id == s.TeamId)?.Name ?? s.TeamId.ToString())</td>
+                        <td>Round @(rounds.FirstOrDefault(r => r.Id == s.RoundId)?.Number ?? s.RoundId)</td>
+                        <td>@(objectives.FirstOrDefault(o => o.Id == s.ObjectiveId)?.Name ?? s.ObjectiveId.ToString())</td>
+                        <td class="text-end fw-bold">@s.Points</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-danger" @onclick="() => RemoveScore(s.Id)">Remove</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr class="table-dark">
+                    <td colspan="3"><strong>Total</strong></td>
+                    <td class="text-end fw-bold">@scores.Sum(s => s.Points)</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    }
+</div>
+
+@code {
+    private List<Team> teams = [];
+    private List<Round> rounds = [];
+    private List<Objective> objectives = [];
+    private List<Score> scores = [];
+
+    private int scoreTeamId;
+    private int scoreRoundId;
+    private int scoreObjectiveId;
+    private int scorePoints = 100;
+
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            teams = (await ApiClient.GetTeamsAsync()).ToList();
+            rounds = (await ApiClient.GetRoundsAsync()).ToList();
+            objectives = (await ApiClient.GetObjectivesAsync()).ToList();
+            scores = (await ApiClient.GetScoresAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load scoreboard: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task AddScore()
+    {
+        if (scoreTeamId == 0 || scoreRoundId == 0 || scoreObjectiveId == 0) return;
+        errorMessage = null;
+        try
+        {
+            await ApiClient.AddScoreAsync(scoreTeamId, scoreRoundId, scoreObjectiveId, scorePoints);
+            scorePoints = 100;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to add score: {ex.Message}";
+        }
+    }
+
+    private async Task RemoveScore(int id)
+    {
+        errorMessage = null;
+        try
+        {
+            await ApiClient.RemoveScoreAsync(id);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to remove score: {ex.Message}";
+        }
+    }
+
+    private int RoundScore(int teamId, int roundId)
+        => scores.Where(s => s.TeamId == teamId && s.RoundId == roundId).Sum(s => s.Points);
+
+    private int TotalScore(int teamId)
+        => scores.Where(s => s.TeamId == teamId).Sum(s => s.Points);
+}

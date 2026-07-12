@@ -1,0 +1,59 @@
+@page "/admin/users"
+@attribute [Authorize(Roles = "Administrator")]
+
+@using Armageddon.Abstractions.Models
+@using Armageddon.Web.Services
+
+@inject IArmageddonApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<h1>Users</h1>
+
+<button class="btn btn-primary mb-3" @onclick="CreateUser">Create user</button>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Roles</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var u in users)
+        {
+            <tr>
+                <td>@u.UserName</td>
+                <td>@u.Email</td>
+                <td>@(string.Join(',', roleMap.GetValueOrDefault(u.Id, Array.Empty<string>())))</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteUser(u.Id)">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private IReadOnlyList<User> users = Array.Empty<User>();
+    private Dictionary<Guid, string[]> roleMap = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        users = (await ApiClient.GetUsersAsync()).ToList();
+        roleMap = users.ToDictionary(u => u.Id, u => u.Roles ?? Array.Empty<string>());
+    }
+
+    private void CreateUser()
+    {
+        NavigationManager.NavigateTo("/Account/Register");
+    }
+
+    private async Task DeleteUser(Guid id)
+    {
+        await ApiClient.DeleteUserAsync(id.ToString());
+        users = (await ApiClient.GetUsersAsync()).ToList();
+        StateHasChanged();
+    }
+}

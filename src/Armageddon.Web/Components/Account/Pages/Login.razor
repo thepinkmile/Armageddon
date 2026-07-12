@@ -1,0 +1,85 @@
+﻿@page "/Account/Login"
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using Armageddon.Web.Services
+
+@inject AuthService AuthService
+@inject TokenProvider TokenProvider
+@inject ILogger<Login> Logger
+@inject NavigationManager NavigationManager
+
+<PageTitle>Log in</PageTitle>
+
+<h1>Log in</h1>
+<div class="row">
+    <div class="col-lg-6">
+        <section>
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+            <EditForm Model="Input" OnValidSubmit="LoginUser">
+                <DataAnnotationsValidator />
+                <h2>Use a local account to log in.</h2>
+                <hr />
+                <ValidationSummary class="text-danger" role="alert" />
+                <div class="form-floating mb-3">
+                    <InputText @bind-Value="Input.Identifier" id="Input.Identifier" class="form-control" autocomplete="username" aria-required="true" placeholder="username or email" />
+                    <label for="Input.Identifier" class="form-label">Username or email</label>
+                    <ValidationMessage For="() => Input.Identifier" class="text-danger" />
+                </div>
+                <div class="form-floating mb-3">
+                    <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="password" />
+                    <label for="Input.Password" class="form-label">Password</label>
+                    <ValidationMessage For="() => Input.Password" class="text-danger" />
+                </div>
+                <div>
+                    <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
+                </div>
+            </EditForm>
+        </section>
+    </div>
+</div>
+
+@code {
+    private string? errorMessage;
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private async Task LoginUser()
+    {
+        errorMessage = null;
+        Logger.LogInformation("LoginUser invoked for '{Identifier}'", Input.Identifier);
+        var ok = await AuthService.LoginAsync(Input.Identifier, Input.Password);
+        if (ok)
+        {
+            if (TokenProvider.MustChangePassword)
+                NavigationManager.NavigateTo("/Account/Manage/ChangePassword");
+            else
+            {
+                var destination = !string.IsNullOrWhiteSpace(ReturnUrl) && !ReturnUrl.Contains("/Account/Login", StringComparison.OrdinalIgnoreCase)
+                    ? ReturnUrl
+                    : "/";  // Tournament (default page)
+                NavigationManager.NavigateTo(destination);
+            }
+        }
+        else
+        {
+            errorMessage = "Invalid username or password.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [Display(Name = "Username or email")]
+        public string Identifier { get; set; } = "";
+
+        [Required]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+    }
+}

@@ -1,0 +1,258 @@
+@page "/scoring"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Armageddon.Abstractions.Models
+@using Armageddon.Web.Services
+@inject IArmageddonApiClient ApiClient
+
+<PageTitle>Game Setup</PageTitle>
+
+<h2>Game Setup</h2>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == "teams" ? "active" : "")" @onclick='() => activeTab = "teams"'>
+            Teams @if (teams.Any()) { <span class="badge bg-secondary ms-1">@teams.Count</span> }
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == "objectives" ? "active" : "")" @onclick='() => activeTab = "objectives"'>
+            Objectives @if (objectives.Any()) { <span class="badge bg-secondary ms-1">@objectives.Count</span> }
+        </button>
+    </li>
+</ul>
+
+@if (isLoading)
+{
+    <p><em>Loading…</em></p>
+}
+else if (activeTab == "teams")
+{
+    <!-- ── Teams ── -->
+    <div class="row justify-content-start">
+        <div class="col-md-6">
+            <div class="input-group mb-3">
+                <input class="form-control" placeholder="Team name" @bind="newTeamName" @bind:event="oninput" @onkeydown="HandleTeamKeyDown" />
+                <button class="btn btn-primary" @onclick="AddTeam" disabled="@string.IsNullOrWhiteSpace(newTeamName)">Add</button>
+            </div>
+            @if (!teams.Any())
+            {
+                <p class="text-muted">No teams yet.</p>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var team in teams)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>@team.Name</span>
+                            <button class="btn btn-sm btn-danger" @onclick="() => RemoveTeam(team.Id)">Remove</button>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+}
+else if (activeTab == "objectives")
+{
+    <!-- ── Objectives ── -->
+    <div class="row g-2 mb-3 align-items-end">
+        <div class="col-sm-5">
+            <label class="form-label mb-1">Name</label>
+            <input class="form-control" placeholder="Objective name" @bind="newObjectiveName" @bind:event="oninput" @onkeydown="HandleObjectiveKeyDown" />
+        </div>
+        <div class="col-sm-2">
+            <label class="form-label mb-1">Points</label>
+            <input type="number" class="form-control" @bind="newObjectivePoints" min="0" />
+        </div>
+        <div class="col-sm-3">
+            <label class="form-label mb-1">Max Uses <span class="text-muted">(blank = unlimited)</span></label>
+            <input type="number" class="form-control" placeholder="∞" @bind="newObjectiveMaxUsage" />
+        </div>
+        <div class="col-sm-2">
+            <button class="btn btn-primary w-100" @onclick="AddObjective" disabled="@string.IsNullOrWhiteSpace(newObjectiveName)">Add</button>
+        </div>
+    </div>
+
+    @if (!objectives.Any())
+    {
+        <p class="text-muted">No objectives yet.</p>
+    }
+    else
+    {
+        <table class="table table-sm table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th style="width:110px">Points</th>
+                    <th style="width:140px">Max Uses</th>
+                    <th style="width:130px">Type</th>
+                    <th style="width:120px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var obj in objectives)
+                {
+                    @if (editingId == obj.Id)
+                    {
+                        <!-- Edit row -->
+                        <tr class="table-primary">
+                            <td><input class="form-control form-control-sm" @bind="editName" /></td>
+                            <td><input type="number" class="form-control form-control-sm" @bind="editPoints" min="0" /></td>
+                            <td><input type="number" class="form-control form-control-sm" placeholder="∞" @bind="editMaxUsage" /></td>
+                            <td><span class="badge @(BadgeClass(editMaxUsage)) small">@UsageLabel(editMaxUsage)</span></td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-success me-1" @onclick="SaveObjective" disabled="@string.IsNullOrWhiteSpace(editName)">Save</button>
+                                <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">Cancel</button>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <!-- Display row -->
+                        <tr>
+                            <td><strong>@obj.Name</strong></td>
+                            <td>@obj.Points</td>
+                            <td>@(obj.MaxUsage is null or <= 0 ? "∞" : obj.MaxUsage.ToString())</td>
+                            <td><span class="badge @(BadgeClass(obj.MaxUsage))">@obj.UsageLabel</span></td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(obj)">Edit</button>
+                                <button class="btn btn-sm btn-danger" @onclick="() => RemoveObjective(obj.Id)">Remove</button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private List<Team> teams = [];
+    private List<Objective> objectives = [];
+
+    private string activeTab = "teams";
+
+    // ── New team ───────────────────────────────────────────────────────────
+    private string newTeamName = string.Empty;
+
+    // ── New objective ──────────────────────────────────────────────────────
+    private string newObjectiveName = string.Empty;
+    private int    newObjectivePoints = 100;
+    private int?   newObjectiveMaxUsage;
+
+    // ── Edit objective ─────────────────────────────────────────────────────
+    private int?   editingId;
+    private string editName    = string.Empty;
+    private int    editPoints  = 100;
+    private int?   editMaxUsage;
+
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            teams      = (await ApiClient.GetTeamsAsync()).ToList();
+            objectives = (await ApiClient.GetObjectivesAsync()).ToList();
+        }
+        catch (Exception ex) { errorMessage = $"Failed to load data: {ex.Message}"; }
+        finally { isLoading = false; }
+    }
+
+    // ── Teams ──────────────────────────────────────────────────────────────
+    private async Task AddTeam()
+    {
+        if (string.IsNullOrWhiteSpace(newTeamName)) return;
+        try
+        {
+            await ApiClient.AddTeamAsync(newTeamName.Trim());
+            newTeamName = string.Empty;
+            await LoadData();
+        }
+        catch (Exception ex) { errorMessage = $"Failed to add team: {ex.Message}"; }
+    }
+
+    private async Task RemoveTeam(int id)
+    {
+        try { await ApiClient.RemoveTeamAsync(id); await LoadData(); }
+        catch (Exception ex) { errorMessage = $"Failed to remove team: {ex.Message}"; }
+    }
+
+    private async Task HandleTeamKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await AddTeam();
+    }
+
+    // ── Objectives ─────────────────────────────────────────────────────────
+    private async Task AddObjective()
+    {
+        if (string.IsNullOrWhiteSpace(newObjectiveName)) return;
+        try
+        {
+            await ApiClient.AddObjectiveAsync(newObjectiveName.Trim(), newObjectivePoints, newObjectiveMaxUsage);
+            newObjectiveName  = string.Empty;
+            newObjectivePoints   = 100;
+            newObjectiveMaxUsage = null;
+            await LoadData();
+        }
+        catch (Exception ex) { errorMessage = $"Failed to add objective: {ex.Message}"; }
+    }
+
+    private void StartEdit(Objective obj)
+    {
+        editingId   = obj.Id;
+        editName    = obj.Name;
+        editPoints  = obj.Points;
+        editMaxUsage = obj.MaxUsage is <= 0 ? null : obj.MaxUsage;
+        errorMessage = null;
+    }
+
+    private void CancelEdit()
+    {
+        editingId = null;
+        errorMessage = null;
+    }
+
+    private async Task SaveObjective()
+    {
+        if (editingId is null || string.IsNullOrWhiteSpace(editName)) return;
+        try
+        {
+            await ApiClient.UpdateObjectiveAsync(editingId.Value, editName.Trim(), editPoints, editMaxUsage);
+            editingId = null;
+            await LoadData();
+        }
+        catch (Exception ex) { errorMessage = $"Failed to update objective: {ex.Message}"; }
+    }
+
+    private async Task RemoveObjective(int id)
+    {
+        try { await ApiClient.RemoveObjectiveAsync(id); await LoadData(); }
+        catch (Exception ex) { errorMessage = $"Failed to remove objective: {ex.Message}"; }
+    }
+
+    private async Task HandleObjectiveKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await AddObjective();
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    private static string UsageLabel(int? maxUsage) => maxUsage is null or <= 0
+        ? "Recurring" : maxUsage == 1 ? "one-time" : $"limited: {maxUsage}";
+
+    private static string BadgeClass(int? maxUsage) => maxUsage == 1
+        ? "bg-warning text-dark" : maxUsage > 1 ? "bg-secondary" : "bg-info text-dark";
+}

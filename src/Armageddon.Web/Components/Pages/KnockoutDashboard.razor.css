@@ -1,0 +1,62 @@
+/* ── Match card ────────────────────────────────────────────────────── */
+.match-card {
+    border-radius: 6px;
+    padding: 0.5rem;
+    background: #fff;
+    border: 2px solid #6c757d;
+}
+
+.match-card.status-completed  { border-color: #198754; }
+.match-card.status-inprogress { border-color: #0d6efd; }
+
+/* Playoff variant — dashed amber border, warm background */
+.match-card.playoff {
+    background: #fffbea;
+    border-style: dashed;
+    border-color: #ffc107;
+}
+
+.match-card.playoff.status-completed  { border-color: #856404; }
+.match-card.playoff.status-inprogress { border-color: #664d03; }
+
+/* ── Qualifier label inside the card ───────────────────────────────── */
+.qualifier-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #856404;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+}
+
+/* ── Team rows ─────────────────────────────────────────────────────── */
+.team-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.1rem 0;
+    color: #333;
+}
+
+.team-row.tbd       { color: #aaa; }
+.team-row.winner    { font-weight: bold; color: #198754; }
+.team-row.winner.playoff { color: #856404; }
+
+/* ── Winner line beneath the card ─────────────────────────────────── */
+.match-result {
+    margin-top: 0.25rem;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #198754;
+}
+
+.match-result.playoff { color: #856404; }
+
+/* ── Qualifier column ──────────────────────────────────────────────── */
+.qualifier-column {
+    display: flex;
+    flex-direction: column;
+    min-width: 200px;
+    border-left: 2px dashed #ffc107;
+    padding-left: 0.75rem;
+}

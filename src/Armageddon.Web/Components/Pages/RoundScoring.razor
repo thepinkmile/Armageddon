@@ -1,0 +1,219 @@
+@page "/score"
+@rendermode InteractiveServer
+@using Armageddon.Abstractions.Models
+@using Armageddon.Web.Services
+@inject IArmageddonApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Score Match</PageTitle>
+
+@if (isLoading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (match is null)
+{
+    <div class="alert alert-warning">Match not found. <a href="/knockout">Back to Tournament</a></div>
+}
+else if (match.Status == MatchStatus.Completed)
+{
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/knockout">Tournament</a></li>
+            <li class="breadcrumb-item active">Match Result</li>
+        </ol>
+    </nav>
+
+    <div class="alert alert-success">
+        <strong>Match complete.</strong>
+        @if (match.Winner is not null)
+        {
+            <span> Winner: <strong>@match.Winner.Name</strong></span>
+        }
+    </div>
+    <a href="/knockout" class="btn btn-primary">Back to Tournament</a>
+}
+else
+{
+    var teamA = match.TeamA;
+    var teamB = match.TeamB;
+
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/knockout">Tournament</a></li>
+            <li class="breadcrumb-item active">@(teamA?.Name ?? "TBD") vs @(teamB?.Name ?? "TBD")</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+        <h2 class="mb-0">
+            @(teamA?.Name ?? "TBD") <span class="text-muted">vs</span> @(teamB?.Name ?? "TBD")
+        </h2>
+        <span class="badge bg-primary fs-6">Round @match.RoundNumber</span>
+        <button class="btn btn-danger ms-auto" @onclick="EndMatch" disabled="@isBusy">
+            End Match
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @if (!match.RoundId.HasValue)
+    {
+        <div class="alert alert-info">Preparing scoring round...</div>
+    }
+    else
+    {
+        @if (!objectives.Any())
+        {
+            <div class="alert alert-info">No objectives configured. Set them up in <a href="/scoring">Game Setup</a>.</div>
+        }
+
+        <div class="row g-4">
+            @foreach (var team in new[] { teamA, teamB }.Where(t => t is not null))
+            {
+                var teamId = team!.Id;
+                var teamScores = matchScores.Where(s => s.TeamId == teamId).ToList();
+                var total = teamScores.Sum(s => s.Points);
+
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <strong>@team.Name</strong>
+                            <span class="badge bg-primary fs-6">@total pts</span>
+                        </div>
+
+                        @if (objectives.Any())
+                        {
+                            <div class="card-body border-bottom pb-3">
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach (var obj in objectives)
+                                    {
+                                        var usedCount = teamScores.Count(s => s.ObjectiveId == obj.Id);
+                                        var limit = obj.MaxUsage is null or <= 0 ? -1 : obj.MaxUsage.Value;
+                                        var exhausted = limit != -1 && usedCount >= limit;
+                                        var btnTitle = exhausted
+                                            ? $"Limit reached ({usedCount}/{limit})"
+                                            : $"{obj.Name} — {obj.UsageLabel} (+{obj.Points} pts)";
+                                        <button class="btn btn-sm @(exhausted ? "btn-outline-secondary" : "btn-outline-success")"
+                                                title="@btnTitle"
+                                                disabled="@(exhausted || isBusy)"
+                                                @onclick="() => ApplyObjective(teamId, obj)">
+                                            @obj.Name
+                                            <span class="badge bg-light text-dark ms-1">+@obj.Points</span>
+                                            @if (limit != -1)
+                                            {
+                                                <span class="ms-1 opacity-75 small">@usedCount/@limit</span>
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <div class="card-body p-0">
+                            @if (!teamScores.Any())
+                            {
+                                <p class="p-3 mb-0 text-muted">No scores yet.</p>
+                            }
+                            else
+                            {
+                                <table class="table table-sm mb-0">
+                                    <thead>
+                                        <tr><th>Objective</th><th class="text-end">Points</th><th></th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var s in teamScores)
+                                        {
+                                            <tr>
+                                                <td>@(objectives.FirstOrDefault(o => o.Id == s.ObjectiveId)?.Name ?? s.ObjectiveId.ToString())</td>
+                                                <td class="text-end fw-bold">@s.Points</td>
+                                                <td class="text-end">
+                                                    <button class="btn btn-sm btn-danger" @onclick="() => RemoveScore(s.Id)" disabled="@isBusy">✕</button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery] private int MatchId { get; set; }
+
+    private Match? match;
+    private List<Objective> objectives = [];
+    private List<Score> matchScores = [];
+
+    private bool isLoading = true;
+    private bool isBusy;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            match = await ApiClient.StartMatchAsync(MatchId);
+            objectives = (await ApiClient.GetObjectivesAsync()).ToList();
+            await RefreshScores();
+        }
+        catch (Exception ex) { errorMessage = $"Failed to load match: {ex.Message}"; }
+        finally { isLoading = false; }
+    }
+
+    private async Task RefreshScores()
+    {
+        if (match?.RoundId is not int roundId) return;
+        var all = (await ApiClient.GetScoresAsync()).ToList();
+        matchScores = all
+            .Where(s => s.RoundId == roundId && (s.TeamId == match.TeamAId || s.TeamId == match.TeamBId))
+            .ToList();
+    }
+
+    private async Task ApplyObjective(int teamId, Objective obj)
+    {
+        if (match?.RoundId is null) return;
+        isBusy = true; errorMessage = null;
+        try
+        {
+            await ApiClient.AddScoreAsync(teamId, match.RoundId.Value, obj.Id, obj.Points);
+            await RefreshScores();
+        }
+        catch (Exception ex) { errorMessage = $"Failed to record score: {ex.Message}"; }
+        finally { isBusy = false; }
+    }
+
+    private async Task RemoveScore(int id)
+    {
+        isBusy = true; errorMessage = null;
+        try
+        {
+            await ApiClient.RemoveScoreAsync(id);
+            matchScores = matchScores.Where(s => s.Id != id).ToList();
+        }
+        catch (Exception ex) { errorMessage = $"Failed to remove score: {ex.Message}"; }
+        finally { isBusy = false; }
+    }
+
+    private async Task EndMatch()
+    {
+        isBusy = true; errorMessage = null;
+        try
+        {
+            await ApiClient.CompleteMatchAsync(MatchId);
+            NavigationManager.NavigateTo("/knockout");
+        }
+        catch (Exception ex) { errorMessage = $"Failed to end match: {ex.Message}"; }
+        finally { isBusy = false; }
+    }
+}

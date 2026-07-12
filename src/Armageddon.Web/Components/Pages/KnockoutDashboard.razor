@@ -1,0 +1,331 @@
+@page "/knockout"
+@rendermode InteractiveServer
+@using Armageddon.Abstractions.Models
+@using Armageddon.Web.Services
+@inject IArmageddonApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Tournament</PageTitle>
+
+<div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+    <h2 class="mb-0">Tournament Bracket</h2>
+
+    @if (tournament is not null)
+    {
+        <span class="badge @StatusBadgeClass(tournament.Status) fs-6">@tournament.Status</span>
+
+        @if (tournament.Status == TournamentStatus.NotStarted)
+        {
+            <button class="btn btn-outline-secondary" @onclick="Randomise" disabled="@isBusy">
+                🔀 Randomise Draw
+            </button>
+            @if (matches.Any())
+            {
+                <button class="btn btn-success" @onclick="Start" disabled="@isBusy">
+                    ▶ Start Tournament
+                </button>
+            }
+        }
+
+        @if (tournament.Status != TournamentStatus.NotStarted)
+        {
+            <AuthorizeView>
+                <Authorized>
+                    @if (HasChampion())
+                    {
+                        <button class="btn btn-warning" @onclick="EndTournament" disabled="@isBusy">
+                            🏁 End Tournament
+                        </button>
+                    }
+                    <button class="btn btn-outline-danger btn-sm" @onclick="Reset" disabled="@isBusy">
+                        ↺ Reset Tournament
+                    </button>
+                </Authorized>
+            </AuthorizeView>
+        }
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (isLoading)
+{
+    <p><em>Loading…</em></p>
+}
+else if (!matches.Any())
+{
+    <p class="text-muted">
+        No draw yet. Add teams in <a href="scoring">Game Setup</a>, then click <strong>Randomise Draw</strong>.
+    </p>
+}
+else
+{
+    @* Group matches by round number *@
+    var roundNumbers = matches.Select(m => m.RoundNumber).Distinct().OrderBy(r => r).ToList();
+    @* Total rounds = only main (non-playoff) rounds, for label calculations *@
+    int totalMainRounds = matches.Where(m => !m.IsPlayoff).Select(m => m.RoundNumber).DefaultIfEmpty(0).Max();
+    int totalRounds = roundNumbers.Count;
+
+    <div style="display:flex; gap:1.5rem; overflow-x:auto; align-items:flex-start; padding-bottom:1rem;">
+        @foreach (var roundNum in roundNumbers)
+        {
+            var mainMatches   = matches.Where(m => m.RoundNumber == roundNum && !m.IsPlayoff).OrderBy(m => m.Slot).ToList();
+            var playoffMatches = matches.Where(m => m.RoundNumber == roundNum && m.IsPlayoff).OrderBy(m => m.Slot).ToList();
+            var label         = RoundLabel(roundNum, totalMainRounds);
+            var spacerRem     = Math.Max(1, (int)Math.Pow(2, roundNum - 1));
+
+            @* Main round column *@
+            <div style="display:flex; flex-direction:column; min-width:200px;">
+                <div class="text-center fw-bold mb-2">@label</div>
+
+                @foreach (var match in mainMatches.Where(m => !(m.Status == MatchStatus.Completed && m.TeamAId == null || m.Status == MatchStatus.Completed && m.TeamBId == null)))
+                {
+                    @RenderMatchCard(match, spacerRem)
+                }
+            </div>
+
+            @* Qualifier playoff column — only shown if there are playoff matches for this round *@
+            @if (playoffMatches.Any())
+            {
+                <div class="qualifier-column">
+                    <div class="text-center fw-bold mb-2 text-warning">⚡ Qualifier</div>
+                    <div class="text-muted small text-center mb-2">for @label slot</div>
+
+                    @foreach (var match in playoffMatches)
+                    {
+                        @RenderMatchCard(match, 1)
+                    }
+
+                    @* Qualifier standing summary once all done *@
+                    @if (playoffMatches.All(m => m.Status == MatchStatus.Completed))
+                    {
+                        var qualId = DetermineQualifier(playoffMatches);
+                        var qualTeam = qualId.HasValue
+                            ? (playoffMatches.SelectMany(m => new[] { m.TeamA, m.TeamB }).FirstOrDefault(t => t?.Id == qualId))
+                            : null;
+                        @if (qualTeam != null)
+                        {
+                            <div class="mt-2 text-center text-warning fw-bold small">🏅 Qualifies: @qualTeam.Name</div>
+                        }
+                    }
+                </div>
+            }
+        }
+
+        @* Overall winner *@
+        @{
+            var finalMatch = matches.Where(m => !m.IsPlayoff)
+                .FirstOrDefault(m => m.RoundNumber == totalMainRounds && m.Status == MatchStatus.Completed);
+        }
+        @if (finalMatch?.Winner != null)
+        {
+            <div style="display:flex; flex-direction:column; justify-content:center; padding-top:1rem;">
+                <div style="border:3px solid #ffc107; border-radius:8px; padding:0.75rem; min-width:170px; text-align:center; background:#fff3cd;">
+                    <div class="fw-bold fs-5">🏆 Champion</div>
+                    <div class="fw-bold">@finalMatch.Winner.Name</div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private Tournament? tournament;
+    private List<Match> matches = [];
+    private List<Score> allScores = [];
+    private bool isLoading = true;
+    private bool isBusy;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            tournament = await ApiClient.GetTournamentAsync();
+            matches = (await ApiClient.GetMatchesAsync()).OrderBy(m => m.RoundNumber).ThenBy(m => m.Slot).ToList();
+            allScores = (await ApiClient.GetScoresAsync()).ToList();
+        }
+        catch (Exception ex) { errorMessage = $"Failed to load tournament: {ex.Message}"; }
+        finally { isLoading = false; }
+    }
+
+    private async Task Randomise()
+    {
+        isBusy = true; errorMessage = null;
+        try
+        {
+            tournament = await ApiClient.RandomiseTournamentAsync();
+            matches = tournament.Matches.OrderBy(m => m.RoundNumber).ThenBy(m => m.Slot).ToList();
+            allScores = (await ApiClient.GetScoresAsync()).ToList();
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+        finally { isBusy = false; }
+    }
+
+    private async Task Start()
+    {
+        isBusy = true; errorMessage = null;
+        try
+        {
+            tournament = await ApiClient.StartTournamentAsync();
+            matches = tournament.Matches.OrderBy(m => m.RoundNumber).ThenBy(m => m.Slot).ToList();
+            allScores = (await ApiClient.GetScoresAsync()).ToList();
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+        finally { isBusy = false; }
+    }
+
+    private async Task Reset()
+    {
+        isBusy = true; errorMessage = null;
+        try
+        {
+            await ApiClient.ResetTournamentAsync();
+            tournament = await ApiClient.GetTournamentAsync();
+            matches = [];
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+        finally { isBusy = false; }
+    }
+
+    private async Task EndTournament()
+    {
+        isBusy = true; errorMessage = null;
+        try
+        {
+            await ApiClient.FinaliseTournamentAsync();
+            // Reload — tournament is now reset server-side
+            tournament = await ApiClient.GetTournamentAsync();
+            matches = [];
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+        finally { isBusy = false; }
+    }
+
+    private bool HasChampion()
+    {
+        if (!matches.Any()) return false;
+        int totalRounds = matches.Where(m => !m.IsPlayoff).Select(m => m.RoundNumber).DefaultIfEmpty(0).Max();
+        return matches.Any(m => !m.IsPlayoff && m.RoundNumber == totalRounds && m.Status == MatchStatus.Completed && m.WinnerId != null);
+    }
+
+    private static string RoundLabel(int roundNumber, int totalRounds)
+    {
+        int fromFinal = totalRounds - roundNumber;
+        return fromFinal switch
+        {
+            0 => "Final",
+            1 => "Semi-Finals",
+            2 => "Quarter-Finals",
+            _ => $"Round of {(int)Math.Pow(2, fromFinal + 1)}"
+        };
+    }
+
+    private static string StatusBadgeClass(TournamentStatus s) => s switch
+    {
+        TournamentStatus.InProgress => "bg-primary",
+        TournamentStatus.Completed  => "bg-success",
+        _                           => "bg-secondary"
+    };
+
+    private RenderFragment RenderMatchCard(Match match, int spacerRem) => __builder =>
+    {
+        var isPlayoff = match.IsPlayoff;
+
+        var statusClass = match.Status switch
+        {
+            MatchStatus.Completed  => "status-completed",
+            MatchStatus.InProgress => "status-inprogress",
+            _                      => ""
+        };
+        var cardClass = $"match-card {statusClass} {(isPlayoff ? "playoff" : "")}".Trim();
+
+        <div class="@cardClass" style="margin-bottom:@(spacerRem)rem;">
+            @if (isPlayoff)
+            {
+                <div class="qualifier-label">⚡ Qualifier Match</div>
+            }
+            @RenderTeamRow(match.TeamA, match.TeamA?.Id == match.WinnerId, match, isPlayoff)
+            <hr style="margin:0.25rem 0;" />
+            @RenderTeamRow(match.TeamB, match.TeamB?.Id == match.WinnerId, match, isPlayoff)
+
+            @if (tournament!.Status == TournamentStatus.InProgress &&
+                 match.Status == MatchStatus.Pending &&
+                 match.TeamAId != null && match.TeamBId != null)
+            {
+                <div class="mt-2">
+                    <a href="/score?matchId=@match.Id" class="btn btn-sm @(isPlayoff ? "btn-warning" : "btn-primary") w-100">▶ Play</a>
+                </div>
+            }
+            else if (tournament!.Status == TournamentStatus.InProgress &&
+                     match.Status == MatchStatus.InProgress)
+            {
+                <div class="mt-2">
+                    <a href="/score?matchId=@match.Id" class="btn btn-sm @(isPlayoff ? "btn-warning" : "btn-outline-warning") w-100">⏩ Continue</a>
+                </div>
+            }
+            @if (match.Status == MatchStatus.Completed && match.Winner != null)
+            {
+                <div class="match-result @(isPlayoff ? "playoff" : "")">
+                    @(isPlayoff ? "🏅" : "✔") @match.Winner.Name @(isPlayoff ? "qualifies" : "wins")
+                </div>
+            }
+        </div>
+    };
+
+    /// <summary>Client-side mirror of the server qualifier logic: most wins, then most points, then lowest Id.</summary>
+    private int? DetermineQualifier(IEnumerable<Match> playoffMatches)
+    {
+        var completed = playoffMatches.Where(m => m.Status == MatchStatus.Completed).ToList();
+        if (!completed.Any()) return null;
+
+        var teamIds = completed
+            .SelectMany(m => new[] { m.TeamAId, m.TeamBId })
+            .Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+
+        var wins   = teamIds.ToDictionary(id => id, _ => 0);
+        var points = teamIds.ToDictionary(id => id, _ => 0);
+
+        foreach (var m in completed)
+        {
+            if (m.WinnerId.HasValue && wins.ContainsKey(m.WinnerId.Value))
+                wins[m.WinnerId.Value]++;
+
+            int scoreA = allScores.Where(s => s.TeamId == m.TeamAId && s.RoundId == m.RoundId).Sum(s => s.Points);
+            int scoreB = allScores.Where(s => s.TeamId == m.TeamBId && s.RoundId == m.RoundId).Sum(s => s.Points);
+            if (m.TeamAId.HasValue) points[m.TeamAId.Value] += scoreA;
+            if (m.TeamBId.HasValue) points[m.TeamBId.Value] += scoreB;
+        }
+
+        return teamIds
+            .OrderByDescending(id => wins[id])
+            .ThenByDescending(id => points[id])
+            .ThenBy(id => id)
+            .Cast<int?>()
+            .FirstOrDefault();
+    }
+
+    private RenderFragment RenderTeamRow(Team? team, bool isWinner, Match match, bool isPlayoff = false) => __builder =>
+    {
+        var rowClass = team == null ? "team-row tbd"
+                     : isWinner    ? $"team-row winner {(isPlayoff ? "playoff" : "")}".Trim()
+                     :               "team-row";
+        <div class="@rowClass">
+            <span>@(team?.Name ?? "(TBD)")</span>
+            @if (team != null && match.RoundId.HasValue)
+            {
+                <span style="margin-left:0.5rem;">@GetRoundScore(team.Id, match.RoundId.Value) pts</span>
+            }
+        </div>
+    };
+
+    private int GetRoundScore(int teamId, int roundId)
+        => allScores.Where(s => s.TeamId == teamId && s.RoundId == roundId).Sum(s => s.Points);
+}

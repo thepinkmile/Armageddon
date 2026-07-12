@@ -1,0 +1,77 @@
+@page "/admin/roles"
+@attribute [Authorize(Roles = "Administrator")]
+
+@using Armageddon.Abstractions.Models
+@using Armageddon.Web.Services
+
+@inject IArmageddonApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<h1>Roles</h1>
+
+<EditForm Model="newRole" OnValidSubmit="CreateRole">
+    <InputText @bind-Value="newRole" placeholder="Role name" />
+    <button class="btn btn-primary">Create</button>
+</EditForm>
+
+<table class="table mt-3">
+    <thead>
+        <tr><th>Role</th><th>Members</th><th></th></tr>
+    </thead>
+    <tbody>
+    @foreach (var r in roles)
+        {
+            <tr>
+                <td>@r.Name</td>
+                <td>
+                    @if (roleMembers.TryGetValue(r.Name ?? string.Empty, out var members))
+                    {
+                        @(string.Join(',', members))
+                    }
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteRole(r.Name)">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<Role> roles = new();
+    private string newRole = string.Empty;
+    private Dictionary<string, List<string>> roleMembers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        roles = (await ApiClient.GetRolesAsync()).ToList();
+        roleMembers = new Dictionary<string, List<string>>();
+        var users = (await ApiClient.GetUsersAsync()).ToList();
+        foreach (var r in roles)
+        {
+            var members = users.Where(u => (u.Roles ?? Array.Empty<string>()).Contains(r.Name)).Select(u => u.UserName ?? string.Empty).ToList();
+            roleMembers[r.Name ?? string.Empty] = members;
+        }
+    }
+
+    private async Task CreateRole()
+    {
+        if (string.IsNullOrWhiteSpace(newRole)) return;
+        await ApiClient.CreateRoleAsync(new CreateRoleRequest(newRole.Trim()));
+        roles = (await ApiClient.GetRolesAsync()).ToList();
+        newRole = string.Empty;
+    }
+
+    private async Task DeleteRole(string? roleName)
+    {
+        if (string.IsNullOrEmpty(roleName)) return;
+        await ApiClient.DeleteRoleAsync(roleName!);
+        roles = (await ApiClient.GetRolesAsync()).ToList();
+    }
+
+    private async Task<IEnumerable<string>> GetMembers(Role role)
+    {
+        var users = (await ApiClient.GetUsersAsync()).ToList();
+        return users.Where(u => (u.Roles ?? Array.Empty<string>()).Contains(role.Name)).Select(u => u.UserName ?? string.Empty);
+    }
+}
