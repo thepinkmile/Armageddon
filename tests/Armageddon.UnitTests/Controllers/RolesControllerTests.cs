@@ -16,7 +16,7 @@ public class RolesControllerTests
         var store = Substitute.For<IRoleStore<IdentityRole>>();
         var validators = Enumerable.Empty<IRoleValidator<IdentityRole>>();
         var keyNorm = Substitute.For<ILookupNormalizer>();
-        keyNorm.NormalizeName(Arg.Any<string>()).Returns(x => ((string)x[0]).ToUpperInvariant());
+        keyNorm.NormalizeName(Arg.Any<string?>()).Returns(x => ((string?)x[0])?.ToUpperInvariant());
         var errors = new IdentityErrorDescriber();
         var logger = Substitute.For<ILogger<RoleManager<IdentityRole>>>();
         return Substitute.For<RoleManager<IdentityRole>>(store, validators, keyNorm, errors, logger);
@@ -93,7 +93,7 @@ public class RolesControllerTests
     public async Task Delete_Returns404_WhenNotFound()
     {
         var rm = MockRoleManager();
-        rm.FindByIdAsync("no-id").ReturnsNull();
+        rm.FindByIdAsync("no-id").Returns(default(IdentityRole));
         var sut = new RolesController(rm);
 
         var result = await sut.Delete("no-id");

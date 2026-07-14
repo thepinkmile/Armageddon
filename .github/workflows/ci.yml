@@ -32,10 +32,12 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          dotnet test tests/Armageddon.UnitTests/Armageddon.UnitTests.csproj \
+          dotnet test Armageddon.slnx \
             --no-build \
             --configuration Release \
+            --collect:"XPlat Code Coverage" \
             --settings armageddon.runsettings \
+            --filter "FullyQualifiedName~UnitTests" \
             --logger "trx;LogFileName=UnitTests.trx" \
             --results-directory "${{ github.workspace }}/tests/output/test-results"
 
@@ -55,7 +57,7 @@ jobs:
       - name: Generate coverage report
         run: |
           reportgenerator \
-            "-reports:${{ github.workspace }}/tests/output/coverage/coverage.cobertura.xml" \
+            "-reports:${{ github.workspace }}/tests/output/test-results/**/coverage.cobertura.xml" \
             "-targetdir:${{ github.workspace }}/tests/output/coverage/report" \
             -reporttypes:"MarkdownSummaryGithub;Cobertura;Html"
 

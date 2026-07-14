@@ -53,10 +53,13 @@ public class AuthService(HttpClient client, TokenProvider tokenProvider, IApiAut
             }
             else
             {
-                // Token expired or rejected — clear it
+                // Token expired or rejected — clear state then fire the full logout
                 logger.LogInformation("AuthService.InitializeAsync: stored token rejected by API, clearing");
                 tokenProvider.Token = null;
-                await LogoutAsync();
+                tokenProvider.MustChangePassword = false;
+                authStateProvider.NotifyUserLogout();
+                try { await jsRuntime.InvokeVoidAsync("localStorage.removeItem", TokenKey); } catch { }
+                try { await client.PostAsync("api/auth/logout", null); } catch { }
             }
         }
         catch (Exception ex)

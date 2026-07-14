@@ -253,8 +253,8 @@ public class AuthServiceTests
     [Fact]
     public async Task InitializeAsync_NoStoredToken_DoesNothing()
     {
-        var (sut, mockHttp, tokenProvider, authState, jsRuntime) = CreateSut();
-        jsRuntime.InvokeAsync<string?>(TokenKey, Arg.Any<object[]>())
+        var (sut, _, tokenProvider, authState, jsRuntime) = CreateSut();
+        jsRuntime.InvokeAsync<string?>(TokenKey, Arg.Any<object?[]?>())
             .Returns(new ValueTask<string?>(default(string)));
 
         await sut.InitializeAsync();
@@ -266,8 +266,8 @@ public class AuthServiceTests
     [Fact]
     public async Task InitializeAsync_ValidStoredToken_RestoresSession()
     {
-        var (sut, mockHttp, tokenProvider, authState, jsRuntime) = CreateSut();
-        jsRuntime.InvokeAsync<string?>("localStorage.getItem", Arg.Any<object[]>())
+        var (sut, mockHttp, _, authState, jsRuntime) = CreateSut();
+        jsRuntime.InvokeAsync<string?>("localStorage.getItem", Arg.Any<object?[]?>())
             .Returns(new ValueTask<string?>("stored-jwt"));
         mockHttp.When(HttpMethod.Get, "http://api/api/auth/me")
             .Respond("application/json", System.Text.Json.JsonSerializer.Serialize(SampleUser));
@@ -281,13 +281,10 @@ public class AuthServiceTests
     public async Task InitializeAsync_RejectedStoredToken_ClearsTokenAndLogsOut()
     {
         var (sut, mockHttp, tokenProvider, authState, jsRuntime) = CreateSut();
-        jsRuntime.InvokeAsync<string?>("localStorage.getItem", Arg.Any<object[]>())
+        jsRuntime.InvokeAsync<string?>("localStorage.getItem", Arg.Any<object?[]?>())
             .Returns(new ValueTask<string?>("expired-jwt"));
         mockHttp.When(HttpMethod.Get, "http://api/api/auth/me")
             .Respond(HttpStatusCode.Unauthorized);
-        // LogoutAsync will call removeItem and POST logout
-        jsRuntime.InvokeAsync<object>(Arg.Any<string>(), Arg.Any<object[]>())
-            .Returns(new ValueTask<object>(new object()));
         mockHttp.When(HttpMethod.Post, "http://api/api/auth/logout")
             .Respond(HttpStatusCode.OK);
 
@@ -301,7 +298,7 @@ public class AuthServiceTests
     public async Task InitializeAsync_JsRuntimeThrows_DoesNotPropagate()
     {
         var (sut, _, _, _, jsRuntime) = CreateSut();
-        jsRuntime.InvokeAsync<string?>(Arg.Any<string>(), Arg.Any<object[]>())
+        jsRuntime.InvokeAsync<string?>(Arg.Any<string>(), Arg.Any<object?[]?>())
             .Returns(ValueTask.FromException<string?>(new JSException("storage unavailable")));
 
         var act = async () => await sut.InitializeAsync();
