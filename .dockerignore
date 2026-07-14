@@ -1,0 +1,31 @@
+# Build artefacts
+**/bin/
+**/obj/
+
+# Test projects — never included in production images
+tests/
+
+# Local database files (mounted as a volume at runtime)
+**/*.db
+**/*.db-shm
+**/*.db-wal
+
+# Git / IDE
+.git/
+.github/
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Coverage / test results
+coverage/
+coverage-results/
+test-results/
+
+# Scripts and docs that aren't needed in the image
+*.ps1
+*.md
+*.slnx
+*.editorconfig
+Dockerfile.coverage

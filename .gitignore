@@ -427,3 +427,16 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+output/
+
+# ── Project-specific local output folders ─────────────────────────────────────
+# Test output — coverage reports, TRX results, and VS Test Explorer GUID folders
+tests/output/
+**/TestResults/
+**/coverage/
+**/coverage-report/
+
+# Deployment secrets — PFX contains private key, never commit it
+# The public .crt is intentionally committed so it can be baked into the Docker image
+deployment/certs/*.pfx

@@ -1,5 +1,6 @@
 ﻿@using Armageddon.Web.Components.Account.Shared
 @using Armageddon.Web.Services
+@using System.Diagnostics.CodeAnalysis
 @inject AuthService AuthService
 @inject TokenProvider TokenProvider
 @inject NavigationManager NavigationManager
@@ -26,6 +27,7 @@ else
     private const string ChangePasswordPath = "/Account/Manage/ChangePassword";
     private bool _initialized = false;
 
+    [ExcludeFromCodeCoverage(Justification = "OnAfterRenderAsync requires a live Blazor Server circuit and browser JS/localStorage interop; not exercisable in unit tests.")]
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
