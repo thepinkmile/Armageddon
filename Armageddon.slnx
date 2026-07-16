@@ -10,6 +10,8 @@
     <File Path="Directory.Build.props" />
     <File Path="docker-compose.override.yml" />
     <File Path="docker-compose.yml" />
+    <File Path="dotnet-tools.json" />
+    <File Path="LICENSE" />
     <File Path="README.md" />
   </Folder>
   <Folder Name="/src/">

@@ -35,6 +35,10 @@ public interface IArmageddonApiClient
     Task<IEnumerable<TournamentResult>> GetTournamentResultsAsync();
     Task ResetTournamentAsync();
 
+    // Settings
+    Task<Setting?> GetSettingAsync(string name);
+    Task<Setting> UpsertSettingAsync(string name, string value);
+
     // Authentication / user management
     Task<string?> LoginAsync(string identifier, string password);
     Task LogoutAsync();

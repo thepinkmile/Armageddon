@@ -1,9 +1,12 @@
 @page "/score"
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 @using Armageddon.Abstractions.Models
 @using Armageddon.Web.Services
 @inject IArmageddonApiClient ApiClient
 @inject NavigationManager NavigationManager
+@inject GameSettingsService GameSettings
+@inject IJSRuntime JS
 
 <PageTitle>Score Match</PageTitle>
 
@@ -50,9 +53,22 @@ else
             @(teamA?.Name ?? "TBD") <span class="text-muted">vs</span> @(teamB?.Name ?? "TBD")
         </h2>
         <span class="badge bg-primary fs-6">Round @match.RoundNumber</span>
-        <button class="btn btn-danger ms-auto" @onclick="EndMatch" disabled="@isBusy">
-            End Match
-        </button>
+
+        <div class="d-flex align-items-center gap-2 ms-auto">
+            <span class="badge @TimerBadgeClass fs-5 font-monospace" title="Match timer">⏱ @FormatTime(remainingSeconds)</span>
+            @if (timerRunning)
+            {
+                <button class="btn btn-outline-warning btn-sm" @onclick="PauseTimer">⏸ Pause</button>
+            }
+            else if (!timerExpired)
+            {
+                <button class="btn btn-outline-success btn-sm" @onclick="StartTimer" disabled="@(remainingSeconds == 0)">▶ Start</button>
+            }
+            <button class="btn btn-outline-secondary btn-sm" @onclick="ResetTimer">↺ Reset</button>
+            <button class="btn btn-danger" @onclick="EndMatch" disabled="@isBusy">
+                End Match
+            </button>
+        </div>
     </div>
 
     @if (!string.IsNullOrEmpty(errorMessage))
@@ -157,6 +173,82 @@ else
     private bool isBusy;
     private string? errorMessage;
 
+    // ── Timer ──────────────────────────────────────────────────────────────
+    private int remainingSeconds;
+    private bool timerRunning;
+    private bool timerExpired;
+    private PeriodicTimer? _periodicTimer;
+    private CancellationTokenSource? _timerCts;
+
+    private string TimerBadgeClass => remainingSeconds == 0
+        ? "bg-danger"
+        : remainingSeconds <= 60
+            ? "bg-warning text-dark"
+            : "bg-secondary";
+
+    private static string FormatTime(int totalSeconds)
+    {
+        var m = totalSeconds / 60;
+        var s = totalSeconds % 60;
+        return $"{m:D2}:{s:D2}";
+    }
+
+    private async Task StartTimer()
+    {
+        if (remainingSeconds == 0 || timerRunning) return;
+        timerRunning = true;
+        StateHasChanged();
+        _timerCts = new CancellationTokenSource();
+        await RunTimerAsync(_timerCts.Token);
+    }
+
+    private async Task RunTimerAsync(CancellationToken ct)
+    {
+        _periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        var expired = false;
+        try
+        {
+            while (remainingSeconds > 0 && await _periodicTimer.WaitForNextTickAsync(ct))
+            {
+                remainingSeconds--;
+                await InvokeAsync(StateHasChanged);
+            }
+            expired = remainingSeconds == 0;
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            timerRunning = false;
+            _periodicTimer.Dispose();
+            _periodicTimer = null;
+            await InvokeAsync(StateHasChanged);
+        }
+        if (expired)
+        {
+            timerExpired = true;
+            await InvokeAsync(StateHasChanged);
+            await JS.InvokeVoidAsync("playMatchSiren");
+        }
+    }
+
+    private Task PauseTimer()
+    {
+        _timerCts?.Cancel();
+        timerRunning = false;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task ResetTimer()
+    {
+        _timerCts?.Cancel();
+        timerRunning = false;
+        timerExpired = false;
+        remainingSeconds = GameSettings.MatchDurationMinutes * 60;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
     protected override async Task OnInitializedAsync()
     {
         isLoading = true;
@@ -166,6 +258,8 @@ else
             match = await ApiClient.StartMatchAsync(MatchId);
             objectives = (await ApiClient.GetObjectivesAsync()).ToList();
             await RefreshScores();
+            await GameSettings.LoadAsync();
+            remainingSeconds = GameSettings.MatchDurationMinutes * 60;
         }
         catch (Exception ex) { errorMessage = $"Failed to load match: {ex.Message}"; }
         finally { isLoading = false; }
@@ -207,6 +301,10 @@ else
 
     private async Task EndMatch()
     {
+        // Stop the timer immediately before navigating away
+        _timerCts?.Cancel();
+        timerRunning = false;
+
         isBusy = true; errorMessage = null;
         try
         {
@@ -215,5 +313,13 @@ else
         }
         catch (Exception ex) { errorMessage = $"Failed to end match: {ex.Message}"; }
         finally { isBusy = false; }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _timerCts?.Cancel();
+        _timerCts?.Dispose();
+        _periodicTimer?.Dispose();
+        return ValueTask.CompletedTask;
     }
 }

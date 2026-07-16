@@ -4,6 +4,7 @@
 @using Armageddon.Abstractions.Models
 @using Armageddon.Web.Services
 @inject IArmageddonApiClient ApiClient
+@inject GameSettingsService GameSettings
 
 <PageTitle>Game Setup</PageTitle>
 
@@ -17,13 +18,18 @@
 <!-- Tabs -->
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
-        <button class="nav-link @(activeTab == "teams" ? "active" : "")" @onclick='() => activeTab = "teams"'>
+        <button class="nav-link @(activeTab == "teams" ? "active" : "")" @onclick='() => SwitchTab("teams")'>
             Teams @if (teams.Any()) { <span class="badge bg-secondary ms-1">@teams.Count</span> }
         </button>
     </li>
     <li class="nav-item">
-        <button class="nav-link @(activeTab == "objectives" ? "active" : "")" @onclick='() => activeTab = "objectives"'>
+        <button class="nav-link @(activeTab == "objectives" ? "active" : "")" @onclick='() => SwitchTab("objectives")'>
             Objectives @if (objectives.Any()) { <span class="badge bg-secondary ms-1">@objectives.Count</span> }
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == "settings" ? "active" : "")" @onclick='() => SwitchTab("settings")'>
+            Settings
         </button>
     </li>
 </ul>
@@ -59,6 +65,32 @@ else if (activeTab == "teams")
             }
         </div>
     </div>
+}
+else if (activeTab == "settings")
+{
+    <!-- ── Settings ── -->
+    @if (isLoadingSettings)
+    {
+        <p><em>Loading settings…</em></p>
+    }
+    else
+    {
+        <div class="row justify-content-start">
+            <div class="col-md-4">
+                <div class="mb-3">
+                    <label class="form-label">Match Duration (minutes)</label>
+                    <input type="number" class="form-control" min="1" max="999"
+                           @bind="editMatchDuration" />
+                    <div class="form-text">Sets the countdown timer shown on the match screen.</div>
+                </div>
+                <button class="btn btn-primary" @onclick="SaveSettings" disabled="@isSavingSettings">Save Settings</button>
+                @if (settingsSaved)
+                {
+                    <span class="ms-2 text-success">&#10003; Saved</span>
+                }
+            </div>
+        </div>
+    }
 }
 else if (activeTab == "objectives")
 {
@@ -140,6 +172,12 @@ else if (activeTab == "objectives")
 
     private string activeTab = "teams";
 
+    // ── Settings ─────────────────────────────────────────────────────────
+    private int  editMatchDuration = 20;
+    private bool isLoadingSettings;
+    private bool isSavingSettings;
+    private bool settingsSaved;
+
     // ── New team ───────────────────────────────────────────────────────────
     private string newTeamName = string.Empty;
 
@@ -157,7 +195,44 @@ else if (activeTab == "objectives")
     private bool isLoading = true;
     private string? errorMessage;
 
-    protected override async Task OnInitializedAsync() => await LoadData();
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        await LoadSettings();
+    }
+
+    private async Task SwitchTab(string tab)
+    {
+        activeTab = tab;
+        if (tab == "settings" && !isLoadingSettings)
+            await LoadSettings();
+    }
+
+    private async Task LoadSettings()
+    {
+        isLoadingSettings = true;
+        settingsSaved = false;
+        try
+        {
+            await GameSettings.LoadAsync();
+            editMatchDuration = GameSettings.MatchDurationMinutes;
+        }
+        catch (Exception ex) { errorMessage = $"Failed to load settings: {ex.Message}"; }
+        finally { isLoadingSettings = false; }
+    }
+
+    private async Task SaveSettings()
+    {
+        isSavingSettings = true;
+        settingsSaved = false;
+        try
+        {
+            await GameSettings.SaveMatchDurationAsync(editMatchDuration);
+            settingsSaved = true;
+        }
+        catch (Exception ex) { errorMessage = $"Failed to save settings: {ex.Message}"; }
+        finally { isSavingSettings = false; }
+    }
 
     private async Task LoadData()
     {

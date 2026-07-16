@@ -38,6 +38,17 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultChallengeScheme = "BlazorChallenge";
+})
+.AddCookie("BlazorChallenge", options =>
+{
+    options.LoginPath = "/Account/Login";
+    options.AccessDeniedPath = "/Account/Login";
+});
+builder.Services.AddAuthorization();
+
 // The Web app no longer hosts any Identity DbContexts or local database files. Authentication is handled by the API via JWT.
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityRedirectManager>();
@@ -63,6 +74,9 @@ builder.Services.AddDataProtection()
 // Shared token store so all HttpClient instances carry the same Bearer token
 builder.Services.AddSingleton<TokenProvider>();
 builder.Services.AddTransient<AuthTokenHandler>();
+
+// Per-session game configuration (timer duration, etc.)
+builder.Services.AddScoped<GameSettingsService>();
 
 // The API uses a self-signed certificate. In production inside Docker the Web container
 // calls the API over https://api:8443, so we must bypass standard CA validation and

@@ -14,6 +14,7 @@ public class ArmageddonDbContext(DbContextOptions<ArmageddonDbContext> options) 
     public DbSet<Match> Matches { get; set; } = null!;
     public DbSet<TournamentResult> TournamentResults { get; set; } = null!;
     public DbSet<TournamentResultEntry> TournamentResultEntries { get; set; } = null!;
+    public DbSet<Setting> Settings { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -38,6 +39,11 @@ public class ArmageddonDbContext(DbContextOptions<ArmageddonDbContext> options) 
              .WithOne(en => en.TournamentResult)
              .HasForeignKey(en => en.TournamentResultId)
              .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<Setting>(e =>
+        {
+            e.HasIndex(s => s.Name).IsUnique();
         });
     }
 }

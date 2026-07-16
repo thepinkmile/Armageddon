@@ -119,6 +119,7 @@ builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IObjectiveService, ObjectiveService>();
 builder.Services.AddScoped<IScoreService, ScoreService>();
 builder.Services.AddScoped<ITournamentService, TournamentService>();
+builder.Services.AddScoped<ISettingService, SettingService>();
 
 builder.Services.AddCors(options =>
 {
