@@ -5,33 +5,21 @@
       "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ApiBaseUrl": "http://localhost:5047"
+        "ApiBaseUrl": "http://localhost:8081"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "http://localhost:5281"
+      "applicationUrl": "http://localhost:8080"
     },
     "https": {
       "commandName": "Project",
       "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ApiBaseUrl": "http://localhost:5047"
+        "ApiBaseUrl": "https://localhost:8444"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "https://localhost:7105;http://localhost:5281"
+      "applicationUrl": "https://localhost:8443;http://localhost:8080"
     },
-    "WSL": {
-      "commandName": "WSL2",
-      "launchBrowser": true,
-      "launchUrl": "https://localhost:7105",
-        "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "https://localhost:7105;http://localhost:5281",
-        "ApiBaseUrl": "http://localhost:5047"
-      },
-      "distributionName": ""
-    }
-    ,
     "Docker": {
       "commandName": "Docker",
       "launchBrowser": true,

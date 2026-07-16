@@ -13,8 +13,8 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var httpPort  = builder.Configuration.GetValue<int?>("Kestrel:Endpoints:Http:Port")  ?? 8080;
-var httpsPort = builder.Configuration.GetValue<int?>("Kestrel:Endpoints:Https:Port") ?? 8443;
+var httpPort  = builder.Configuration.GetValue<int?>("Kestrel:Endpoints:Http:Port")  ?? 8081;
+var httpsPort = builder.Configuration.GetValue<int?>("Kestrel:Endpoints:Https:Port") ?? 8444;
 var certPath = builder.Configuration.GetValue<string>("Kestrel:Certificates:Default:Path");
 
 // Explicitly bind Kestrel to IPv4 only (0.0.0.0) to avoid IPv6 socket hangs on
@@ -128,8 +128,7 @@ builder.Services.AddCors(options =>
 
 // Tell UseHttpsRedirection the explicit HTTPS port since Kestrel is bound via code,
 // not via ASPNETCORE_HTTPS_PORTS, so the middleware cannot auto-detect it.
-builder.Services.Configure<Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionOptions>(options =>
-    options.HttpsPort = httpsPort);
+builder.Services.Configure<Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionOptions>(options => options.HttpsPort = httpsPort);
 
 var app = builder.Build();
 

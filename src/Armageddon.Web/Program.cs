@@ -50,7 +50,7 @@ builder.Services.AddScoped<IApiAuthenticationStateProvider>(sp => (IApiAuthentic
 
 // Identity and user store are owned by the API now. The Web app uses API-issued JWTs.
 
-var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5001";
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:8081";
 
 // Persist DataProtection keys to the mounted volume so they survive container restarts.
 // Without this the antiforgery tokens encrypted by one container instance cannot be

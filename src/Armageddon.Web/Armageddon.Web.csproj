@@ -11,11 +11,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Armageddon.Abstractions\Armageddon.Abstractions.csproj" />
+    <Compile Remove="Data\**" />
+    <Content Remove="Data\**" />
+    <EmbeddedResource Remove="Data\**" />
+    <None Remove="Data\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Data\" />
+    <ProjectReference Include="..\Armageddon.Abstractions\Armageddon.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>
