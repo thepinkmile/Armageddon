@@ -7,8 +7,8 @@ using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var httpPort  = builder.Configuration.GetValue<int?>("Kestrel:Endpoints:Http:Port")  ?? 8080;
-var httpsPort = builder.Configuration.GetValue<int?>("Kestrel:Endpoints:Https:Port") ?? 8443;
+var httpPort  = builder.Configuration.GetValue<int?>("App:HttpPort")  ?? 8080;
+var httpsPort = builder.Configuration.GetValue<int?>("App:HttpsPort") ?? 8443;
 // The public HTTPS port is the port the browser connects to (i.e. the host-side of the
 // Docker port mapping). It may differ from the internal Kestrel httpsPort when running
 // behind a port-mapped container (e.g. host:8444 -> container:8443).

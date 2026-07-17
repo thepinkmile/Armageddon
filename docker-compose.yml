@@ -13,11 +13,13 @@ services:
       - Jwt__Key=${Jwt__Key:?Jwt__Key env var must be set}
       - Jwt__Issuer=Armageddon.Api
       - ASPNETCORE_ENVIRONMENT=Production
+      - App__HttpPort=8080
+      - App__HttpsPort=8443
       - Kestrel__Certificates__Default__Path=/app/certs/armageddon.pfx
       - Kestrel__Certificates__Default__Password=${Kestrel__Certificates__Default__Password:?Certificate password must be set}
       # Uncomment the next lines to enable verbose startup logging for diagnostics:
-      #- Logging__LogLevel__Armageddon.Api=Information
-      #- Logging__LogLevel__Microsoft.Hosting.Lifetime=Information
+      #- Logging__LogLevel__Armageddon.Api=Debug
+      #- Logging__LogLevel__Microsoft.Hosting.Lifetime=Debug
       #- Logging__LogLevel__Microsoft.AspNetCore.Server.Kestrel=Debug
     volumes:
       - /opt/armageddon/data:/app/data
@@ -40,8 +42,10 @@ services:
       # Put secrets in a .env file at the repo root (never commit it):
       #   Kestrel__Certificates__Default__Password=<your-pfx-password>
       - ApiBaseUrl=https://api:8443
+      - ApiCertThumbprint=
       - PublicHttpsPort=8444
-      - ApiCertThumbprint=B61A8723D0CC005561457969E21F48D4E9B26C4A
+      - App__HttpPort=8080
+      - App__HttpsPort=8443
       - ASPNETCORE_ENVIRONMENT=Production
       - Kestrel__Certificates__Default__Path=/app/certs/armageddon.pfx
       - Kestrel__Certificates__Default__Password=${Kestrel__Certificates__Default__Password:?Certificate password must be set}
@@ -52,7 +56,7 @@ services:
       #- Logging__LogLevel__Microsoft.AspNetCore.Components=Debug
       #- Logging__LogLevel__Microsoft.AspNetCore.Components.Server.Circuits=Debug
       #- Logging__LogLevel__Microsoft.AspNetCore.SignalR=Debug
-      #- Logging__LogLevel__Microsoft.Hosting.Lifetime=Information
+      #- Logging__LogLevel__Microsoft.Hosting.Lifetime=Debug
     volumes:
       - /opt/armageddon/web-data:/app/data
       - /opt/armageddon/certs:/app/certs:ro

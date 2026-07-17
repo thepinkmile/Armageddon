@@ -13,8 +13,8 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var httpPort  = builder.Configuration.GetValue<int?>("Kestrel:Endpoints:Http:Port")  ?? 8081;
-var httpsPort = builder.Configuration.GetValue<int?>("Kestrel:Endpoints:Https:Port") ?? 8444;
+var httpPort  = builder.Configuration.GetValue<int?>("App:HttpPort")  ?? 8080;
+var httpsPort = builder.Configuration.GetValue<int?>("App:HttpsPort") ?? 8443;
 var certPath = builder.Configuration.GetValue<string>("Kestrel:Certificates:Default:Path");
 
 // Explicitly bind Kestrel to IPv4 only (0.0.0.0) to avoid IPv6 socket hangs on

@@ -5,7 +5,9 @@
       "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ApiBaseUrl": "http://localhost:8081"
+        "ApiBaseUrl": "http://localhost:8081",
+        "App__HttpPort": "8080",
+        "App__HttpsPort": "8443"
       },
       "dotnetRunMessages": true,
       "applicationUrl": "http://localhost:8080"
@@ -15,7 +17,9 @@
       "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ApiBaseUrl": "https://localhost:8444"
+        "ApiBaseUrl": "https://localhost:8444",
+        "App__HttpPort": "8080",
+        "App__HttpsPort": "8443"
       },
       "dotnetRunMessages": true,
       "applicationUrl": "https://localhost:8443;http://localhost:8080"

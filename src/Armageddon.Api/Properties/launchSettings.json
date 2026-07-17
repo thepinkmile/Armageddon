@@ -7,7 +7,9 @@
       "launchBrowser": false,
       "applicationUrl": "http://localhost:8081",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "App__HttpPort": "8081",
+        "App__HttpsPort": "8444"
       }
     },
     "https": {
@@ -16,7 +18,9 @@
       "launchBrowser": false,
       "applicationUrl": "https://localhost:8444;http://localhost:8081",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "App__HttpPort": "8081",
+        "App__HttpsPort": "8444"
       }
     },
     "Docker": {
