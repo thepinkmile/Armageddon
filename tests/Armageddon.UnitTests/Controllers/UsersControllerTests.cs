@@ -132,7 +132,7 @@ public class UsersControllerTests : IDisposable
         // Create a user with a mocked UserManager that returns failure on Delete
         var mockUm = Substitute.For<UserManager<ApplicationUser>>(
             Substitute.For<IUserStore<ApplicationUser>>(),
-            null, null, null, null, null, null, null, null);
+            null!, null!, null!, null!, null!, null!, null!, null!);
 
         var user = new ApplicationUser { UserName = "target" };
         mockUm.FindByIdAsync("uid").Returns(user);

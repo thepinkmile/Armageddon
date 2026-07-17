@@ -16,8 +16,8 @@
 	  <PrivateAssets>all</PrivateAssets>
 	</PackageReference>
 	<PackageReference Include="FluentAssertions" Version="8.10.0" />
-	<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.10" />
 	<PackageReference Include="NSubstitute" Version="6.0.0" />
+	<PackageReference Include="RichardSzalay.MockHttp" Version="7.0.0" />
 	<PackageReference Include="coverlet.collector" Version="10.0.1">
 	  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 	  <PrivateAssets>all</PrivateAssets>
@@ -29,7 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-	<ProjectReference Include="..\..\src\Armageddon.Api\Armageddon.Api.csproj" />
+	<ProjectReference Include="..\..\src\Armageddon.Web\Armageddon.Web.csproj" />
   </ItemGroup>
 
 </Project>

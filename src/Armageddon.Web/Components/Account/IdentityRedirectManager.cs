@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Components;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Armageddon.Web.Components.Account;
 
+[ExcludeFromCodeCoverage(Justification = "All methods delegate directly to NavigationManager which requires a running Blazor circuit.")]
 public sealed class IdentityRedirectManager(NavigationManager navigationManager)
 {
     public const string StatusCookieName = "Identity.StatusMessage";

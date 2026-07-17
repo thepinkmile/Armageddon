@@ -32,24 +32,24 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          dotnet test tests/Armageddon.UnitTests/Armageddon.UnitTests.csproj \
+          dotnet test Armageddon.slnx \
             --no-build \
             --configuration Release \
-            /p:CollectCoverage=true \
-            /p:CoverletOutputFormat=cobertura \
-            "/p:CoverletOutput=${{ github.workspace }}/coverage/" \
-            "/p:Exclude=[*]*.Migrations.*%2c[*]Program%2c[*]*OpenApi*" \
+            --collect:"XPlat Code Coverage" \
+            --settings armageddon.runsettings \
+            --filter "FullyQualifiedName~UnitTests" \
             --logger "trx;LogFileName=UnitTests.trx" \
-            --results-directory "${{ github.workspace }}/test-results"
+            --results-directory "${{ github.workspace }}/tests/output/test-results"
 
       - name: Run integration tests
         run: |
           dotnet test Armageddon.slnx \
             --no-build \
             --configuration Release \
+            --settings armageddon.runsettings \
             --filter "FullyQualifiedName~IntegrationTests" \
             --logger "trx;LogFileName=IntegrationTests.trx" \
-            --results-directory "${{ github.workspace }}/test-results"
+            --results-directory "${{ github.workspace }}/tests/output/test-results"
 
       - name: Install ReportGenerator
         run: dotnet tool install --global dotnet-reportgenerator-globaltool
@@ -57,8 +57,8 @@ jobs:
       - name: Generate coverage report
         run: |
           reportgenerator \
-            "-reports:${{ github.workspace }}/coverage/coverage.cobertura.xml" \
-            "-targetdir:${{ github.workspace }}/coverage/report" \
+            "-reports:${{ github.workspace }}/tests/output/test-results/**/coverage.cobertura.xml" \
+            "-targetdir:${{ github.workspace }}/tests/output/coverage/report" \
             -reporttypes:"MarkdownSummaryGithub;Cobertura;Html"
 
       - name: Upload test results
@@ -66,18 +66,48 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: "${{ github.workspace }}/test-results/"
+          path: "${{ github.workspace }}/tests/output/test-results/"
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: "${{ github.workspace }}/coverage/report/"
+          path: "${{ github.workspace }}/tests/output/coverage/report/"
 
       - name: Post coverage summary to PR
         if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           recreate: true
-          path: ./coverage/report/SummaryGithub.md
+          path: ./tests/output/coverage/report/SummaryGithub.md
+
+  docker-build:
+    name: Docker Build Smoke Test (linux/arm64)
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image (linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/Armageddon.Api/Dockerfile
+          platforms: linux/arm64
+          push: false
+          tags: armageddon-api:ci
+
+      - name: Build Web image (linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/Armageddon.Web/Dockerfile
+          platforms: linux/arm64
+          push: false
+          tags: armageddon-web:ci

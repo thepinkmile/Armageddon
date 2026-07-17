@@ -1,0 +1,26 @@
+# docker-compose.override.yml — local development only, NOT used on the Pi.
+# Docker Compose merges this automatically when you run `docker compose up`.
+# Overrides: dev environment, relaxed healthcheck timing, no Jwt__Key or cert password requirement.
+# In development Kestrel uses its built-in developer certificate so no PFX is mounted.
+
+services:
+
+  api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Jwt__Key=dev-signing-key-please-change-in-production-0123456789abcdef
+      - Jwt__Issuer=Armageddon.Api
+      # No cert path set in dev — HTTPS endpoint is skipped; HTTP-only locally
+      - Kestrel__Certificates__Default__Path=
+      - Kestrel__Certificates__Default__Password=
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      start_period: 5s
+      interval: 10s
+
+  web:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ApiBaseUrl=http://api:8080
+      - Kestrel__Certificates__Default__Path=
+      - Kestrel__Certificates__Default__Password=

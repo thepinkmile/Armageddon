@@ -1,6 +1,16 @@
 <Solution>
   <Folder Name="/Solution Items/">
+    <File Path=".dockerignore" />
     <File Path=".editorconfig" />
+    <File Path=".env.example" />
+    <File Path=".gitignore" />
+    <File Path="armageddon.runsettings" />
+    <File Path="build.ps1" />
+    <File Path="deploy.ps1" />
+    <File Path="Directory.Build.props" />
+    <File Path="docker-compose.override.yml" />
+    <File Path="docker-compose.yml" />
+    <File Path="README.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Armageddon.Abstractions/Armageddon.Abstractions.csproj" />
@@ -8,9 +18,10 @@
     <Project Path="src/Armageddon.Web/Armageddon.Web.csproj" />
   </Folder>
     <Folder Name="/tests/">
-    <Project Path="tests/Armageddon.UnitTests/Armageddon.UnitTests.csproj" />
-    <Project Path="tests/Armageddon.Api.IntegrationTests/Armageddon.Api.IntegrationTests.csproj" />
-    <Project Path="tests/Armageddon.Web.IntegrationTests/Armageddon.Web.IntegrationTests.csproj" />
-  </Folder>
+      <Project Path="tests/Armageddon.Api.IntegrationTests/Armageddon.Api.IntegrationTests.csproj" />
+      <Project Path="tests/Armageddon.UnitTests/Armageddon.UnitTests.csproj" />
+      <Project Path="tests/Armageddon.Web.IntegrationTests/Armageddon.Web.IntegrationTests.csproj" />
+      <Project Path="tests/Armageddon.Web.UnitTests/Armageddon.Web.UnitTests.csproj" />
+    </Folder>
 </Solution>
 

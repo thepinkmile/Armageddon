@@ -1,0 +1,6 @@
+<Project>
+  <!-- Auto-select the run settings file for Visual Studio Test Explorer and dotnet test. -->
+  <PropertyGroup>
+	<RunSettingsFilePath>$(MSBuildThisFileDirectory)armageddon.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
+</Project>
