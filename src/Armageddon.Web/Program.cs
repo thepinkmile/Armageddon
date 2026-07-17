@@ -7,8 +7,8 @@ using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var httpPort  = builder.Configuration.GetValue<int?>("Kestrel:Endpoints:Http:Port")  ?? 8080;
-var httpsPort = builder.Configuration.GetValue<int?>("Kestrel:Endpoints:Https:Port") ?? 8443;
+var httpPort  = builder.Configuration.GetValue<int?>("App:HttpPort")  ?? 8080;
+var httpsPort = builder.Configuration.GetValue<int?>("App:HttpsPort") ?? 8443;
 // The public HTTPS port is the port the browser connects to (i.e. the host-side of the
 // Docker port mapping). It may differ from the internal Kestrel httpsPort when running
 // behind a port-mapped container (e.g. host:8444 -> container:8443).
@@ -38,6 +38,17 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultChallengeScheme = "BlazorChallenge";
+})
+.AddCookie("BlazorChallenge", options =>
+{
+    options.LoginPath = "/Account/Login";
+    options.AccessDeniedPath = "/Account/Login";
+});
+builder.Services.AddAuthorization();
+
 // The Web app no longer hosts any Identity DbContexts or local database files. Authentication is handled by the API via JWT.
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityRedirectManager>();
@@ -50,7 +61,7 @@ builder.Services.AddScoped<IApiAuthenticationStateProvider>(sp => (IApiAuthentic
 
 // Identity and user store are owned by the API now. The Web app uses API-issued JWTs.
 
-var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5001";
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:8081";
 
 // Persist DataProtection keys to the mounted volume so they survive container restarts.
 // Without this the antiforgery tokens encrypted by one container instance cannot be
@@ -63,6 +74,9 @@ builder.Services.AddDataProtection()
 // Shared token store so all HttpClient instances carry the same Bearer token
 builder.Services.AddSingleton<TokenProvider>();
 builder.Services.AddTransient<AuthTokenHandler>();
+
+// Per-session game configuration (timer duration, etc.)
+builder.Services.AddScoped<GameSettingsService>();
 
 // The API uses a self-signed certificate. In production inside Docker the Web container
 // calls the API over https://api:8443, so we must bypass standard CA validation and

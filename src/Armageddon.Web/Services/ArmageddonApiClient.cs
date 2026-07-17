@@ -99,7 +99,7 @@ public class ArmageddonApiClient(HttpClient http) : IArmageddonApiClient
     public async Task<IEnumerable<Match>> GetMatchesAsync()
     {
         var dtos = await http.GetFromJsonAsync<IEnumerable<MatchDto>>("api/tournament/matches") ?? [];
-        return dtos.Select(MapMatch).ToList();
+        return [.. dtos.Select(MapMatch)];
     }
 
     public async Task<Match> StartMatchAsync(int matchId)
@@ -237,6 +237,23 @@ public class ArmageddonApiClient(HttpClient http) : IArmageddonApiClient
         IsPlayoff = dto.IsPlayoff,
         TournamentId = dto.TournamentId
     };
+
+    // ── Settings ─────────────────────────────────────────────────────────────
+
+    public async Task<Setting?> GetSettingAsync(string name)
+    {
+        var resp = await http.GetAsync($"api/settings/{Uri.EscapeDataString(name)}");
+        if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        resp.EnsureSuccessStatusCode();
+        return await resp.Content.ReadFromJsonAsync<Setting>();
+    }
+
+    public async Task<Setting> UpsertSettingAsync(string name, string value)
+    {
+        var resp = await http.PutAsJsonAsync($"api/settings/{Uri.EscapeDataString(name)}", new { Value = value });
+        resp.EnsureSuccessStatusCode();
+        return (await resp.Content.ReadFromJsonAsync<Setting>())!;
+    }
 
     // ── Private response types ────────────────────────────────────────────────
 

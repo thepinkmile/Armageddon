@@ -440,3 +440,9 @@ tests/output/
 # Deployment secrets — PFX contains private key, never commit it
 # The public .crt is intentionally committed so it can be baked into the Docker image
 deployment/certs/*.pfx
+
+src/Armageddon.Api/armageddon.db
+
+*.db-shm
+
+*.db-wal
